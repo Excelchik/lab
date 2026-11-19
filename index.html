@@ -1,0 +1,3629 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>3D Виртуальная Химическая Лаборатория (Университетский класс)</title>
+<style>
+  :root {
+    --primary: #0284c7;
+    --primary-light: #38bdf8;
+    --accent: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --bg-glass: rgba(255, 255, 255, 0.90);
+    --text-dark: #0f172a;
+    --text-muted: #475569;
+    --border-light: rgba(255, 255, 255, 0.75);
+    --shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #1e293b;
+    color: var(--text-dark);
+  }
+
+  #canvas-container {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+  }
+
+  /* Экран приветствия */
+  #welcome-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(30, 58, 95, 0.88));
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    transition: opacity 0.5s ease;
+  }
+
+  .welcome-card {
+    max-width: 720px;
+    width: 100%;
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 36px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    border: 2px solid #bae6fd;
+    text-align: center;
+  }
+
+  .welcome-badge {
+    display: inline-block;
+    background: #e0f2fe;
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    margin-bottom: 14px;
+    letter-spacing: 0.5px;
+  }
+
+  .welcome-card h1 {
+    font-size: 29px;
+    color: var(--text-dark);
+    margin-bottom: 12px;
+  }
+
+  .welcome-card p {
+    font-size: 15px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+
+  .controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+    text-align: left;
+  }
+
+  .control-item {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+
+  .control-item strong {
+    display: block;
+    color: var(--primary);
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .btn-start {
+    background: linear-gradient(135deg, #0284c7, #0ea5e9);
+    color: white;
+    border: none;
+    padding: 16px 38px;
+    font-size: 18px;
+    font-weight: 700;
+    border-radius: 16px;
+    cursor: pointer;
+    box-shadow: 0 10px 25px rgba(2, 132, 199, 0.35);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .btn-start:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(2, 132, 199, 0.45);
+  }
+
+  /* Основной игровой HUD */
+  #hud {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .hud-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px 20px;
+    gap: 12px;
+  }
+
+  .zone-card {
+    background: var(--bg-glass);
+    backdrop-filter: blur(10px);
+    border: 1px solid #cbd5e1;
+    border-radius: 16px;
+    padding: 12px 18px;
+    box-shadow: var(--shadow);
+    pointer-events: auto;
+    max-width: 340px;
+  }
+
+  .zone-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--primary);
+    font-weight: 700;
+  }
+
+  #current-zone-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-top: 2px;
+  }
+
+  #current-zone-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+
+  .hud-right-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    pointer-events: auto;
+  }
+
+  .hud-btn {
+    background: var(--bg-glass);
+    backdrop-filter: blur(10px);
+    border: 1px solid #cbd5e1;
+    color: var(--text-dark);
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.14);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+
+  .hud-btn:hover {
+    background: #ffffff;
+    border-color: var(--primary-light);
+    transform: translateY(-1px);
+  }
+
+  .hud-btn.primary {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+  }
+
+  /* Мини-радар */
+  .minimap-wrap {
+    position: relative;
+    width: 156px;
+    height: 130px;
+    background: rgba(255, 255, 255, 0.94);
+    border-radius: 16px;
+    border: 2px solid #94a3b8;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  #minimap-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .minimap-hint {
+    position: absolute;
+    bottom: 4px;
+    right: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--primary);
+    background: rgba(255,255,255,0.9);
+    padding: 1px 5px;
+    border-radius: 6px;
+  }
+
+  /* Прицел в центре */
+  #crosshair {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgba(56, 189, 248, 0.95);
+    background: rgba(15, 23, 42, 0.35);
+    border-radius: 50%;
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  }
+
+  #crosshair.active {
+    transform: translate(-50%, -50%) scale(1.45);
+    border-color: var(--accent);
+    background: rgba(16, 185, 129, 0.45);
+  }
+
+  /* Всплывающая подсказка при наведении / приближении к прибору */
+  #interact-prompt {
+    position: fixed;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%) translateY(15px);
+    background: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    border: 2px solid var(--primary);
+    border-radius: 18px;
+    padding: 12px 22px;
+    box-shadow: 0 14px 35px rgba(15, 23, 42, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 15;
+  }
+
+  #interact-prompt.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+  }
+
+  .prompt-info {
+    text-align: left;
+  }
+
+  .prompt-category {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase;
+  }
+
+  .prompt-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+
+  .btn-inspect {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    white-space: nowrap;
+  }
+
+  #pointer-hint {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.82);
+    color: #f8fafc;
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    pointer-events: none;
+  }
+
+  /* Облачко речи робота в 3D-пространстве */
+  #robot-bubble {
+    position: fixed;
+    z-index: 12;
+    max-width: 260px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 2px solid #0284c7;
+    border-radius: 16px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text-dark);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+    pointer-events: none;
+    transform: translate(-50%, -100%);
+    display: none;
+  }
+
+  #robot-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 8px 8px 0;
+    border-style: solid;
+    border-color: #0284c7 transparent transparent;
+  }
+
+  /* Диалоговое окно Инструктора */
+  #instructor-dialog {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(760px, calc(100% - 32px));
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(14px);
+    border: 2px solid #0284c7;
+    border-radius: 22px;
+    padding: 20px 24px;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.35);
+    z-index: 40;
+    display: none;
+  }
+
+  .dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .instructor-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .instructor-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #0284c7, #38bdf8);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+  }
+
+  .instructor-name {
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text-dark);
+  }
+
+  .instructor-role {
+    font-size: 12px;
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  .dialog-text {
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--text-dark);
+    background: #f0f9ff;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border-left: 4px solid var(--primary);
+    margin-bottom: 14px;
+  }
+
+  .dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .dialog-chip {
+    background: #ffffff;
+    border: 1px solid #bae6fd;
+    color: var(--primary);
+    padding: 8px 13px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .dialog-chip:hover {
+    background: var(--primary);
+    color: #ffffff;
+  }
+
+  /* Модальные окна */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(15, 23, 42, 0.62);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+  }
+
+  .modal-overlay.open {
+    display: flex;
+  }
+
+  .modal-box {
+    background: #ffffff;
+    width: min(980px, 100%);
+    max-height: 90vh;
+    border-radius: 24px;
+    box-shadow: 0 25px 60px rgba(15, 23, 42, 0.42);
+    border: 2px solid #94a3b8;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    padding: 18px 24px;
+    background: linear-gradient(135deg, #f1f5f9, #e0f2fe);
+    border-bottom: 1px solid #cbd5e1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-header h2 {
+    font-size: 21px;
+    color: var(--text-dark);
+  }
+
+  .modal-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: none;
+    background: #ffffff;
+    color: var(--text-dark);
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  .modal-close:hover {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .modal-body {
+    padding: 22px 24px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 820px) {
+    .modal-body {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .preview-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  #preview-3d-box {
+    width: 100%;
+    height: 250px;
+    border-radius: 18px;
+    background: radial-gradient(circle at center, #334155, #0f172a);
+    border: 2px solid #64748b;
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+  }
+
+  #preview-3d-box:active {
+    cursor: grabbing;
+  }
+
+  .preview-rotate-tip {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    background: rgba(255,255,255,0.9);
+    padding: 3px 10px;
+    border-radius: 999px;
+    color: var(--text-dark);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .experiment-card {
+    background: #f0fdf4;
+    border: 1.5px solid #86efac;
+    border-radius: 16px;
+    padding: 14px;
+  }
+
+  .experiment-card h4 {
+    font-size: 14px;
+    color: #166534;
+    margin-bottom: 6px;
+  }
+
+  .experiment-status {
+    font-size: 13px;
+    color: #15803d;
+    background: #ffffff;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid #bbf7d0;
+    margin-bottom: 10px;
+    min-height: 42px;
+    line-height: 1.4;
+  }
+
+  .btn-experiment {
+    width: 100%;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 11px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+
+  .btn-experiment:hover {
+    transform: translateY(-1px);
+  }
+
+  .details-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .detail-block {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+
+  .detail-block h3 {
+    font-size: 14px;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+  }
+
+  .detail-block p, .detail-block ul {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-dark);
+  }
+
+  .detail-block ul {
+    padding-left: 18px;
+  }
+
+  .detail-block li {
+    margin-bottom: 4px;
+  }
+
+  /* Большая карта лаборатории */
+  .fullmap-body {
+    padding: 20px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: 1fr 290px;
+    gap: 20px;
+  }
+
+  @media (max-width: 820px) {
+    .fullmap-body {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  #fullmap-canvas {
+    width: 100%;
+    height: 440px;
+    border-radius: 16px;
+    border: 2px solid #94a3b8;
+    background: #334155;
+    cursor: pointer;
+  }
+
+  .zone-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .zone-teleport-btn {
+    text-align: left;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .zone-teleport-btn:hover {
+    background: #e0f2fe;
+    border-color: var(--primary);
+  }
+
+  .zone-teleport-btn strong {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dark);
+  }
+
+  .zone-teleport-btn span {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* Мобильное управление */
+  #mobile-controls {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    display: none;
+  }
+
+  @media (pointer: coarse), (max-width: 900px) {
+    #mobile-controls {
+      display: block;
+    }
+    #pointer-hint {
+      display: none;
+    }
+  }
+
+  #joystick-zone {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    width: 126px;
+    height: 126px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+    border: 2px solid rgba(56, 189, 248, 0.7);
+    pointer-events: auto;
+    touch-action: none;
+  }
+
+  #joystick-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 50px;
+    height: 50px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: rgba(2, 132, 199, 0.9);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  #touch-look-zone {
+    position: absolute;
+    top: 90px;
+    right: 0;
+    width: 55%;
+    height: calc(100% - 190px);
+    pointer-events: auto;
+    touch-action: none;
+  }
+
+  .mobile-action-btns {
+    position: absolute;
+    bottom: 28px;
+    right: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: auto;
+  }
+
+  .mob-btn {
+    background: rgba(2, 132, 199, 0.92);
+    color: white;
+    border: 2px solid rgba(255,255,255,0.75);
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-weight: 700;
+    font-size: 13px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<!-- Экран входа -->
+<div id="welcome-screen">
+  <div class="welcome-card">
+    <div class="welcome-badge">3D УНИВЕРСИТЕТСКАЯ ХИМИЧЕСКАЯ ЛАБОРАТОРИЯ</div>
+    <h1>Виртуальная Химическая Лаборатория</h1>
+    <p>Исследуйте современную многозонную химическую лабораторию от первого лица: тёмные химстойкие столы с металлическими опорами, стеклянная и металлическая аппаратура, шкафы с реактивами и интерактивный робот-инструктор «Атом».</p>
+    <div class="controls-grid">
+      <div class="control-item">
+        <strong>⌨️ Передвижение</strong>
+        Клавиши <b>W, A, S, D</b> или стрелки (<b>Shift</b> — быстрый шаг)
+      </div>
+      <div class="control-item">
+        <strong>🖱️ Обзор камерой</strong>
+        Движение мышью (кликните по экрану для захвата курсора)
+      </div>
+      <div class="control-item">
+        <strong>🔬 Взаимодействие</strong>
+        Подойдите к прибору и нажмите <b>E</b> или кнопку <b>«Изучить»</b>
+      </div>
+      <div class="control-item">
+        <strong>📱 Смартфон / Планшет</strong>
+        Экранный джойстик слева и поворот камеры пальцем справа
+      </div>
+    </div>
+    <button class="btn-start" id="btn-start-lab">Войти в лабораторию</button>
+  </div>
+</div>
+
+<!-- Игровой интерфейс (HUD) -->
+<div id="hud">
+  <div class="hud-top">
+    <div class="zone-card">
+      <div class="zone-label">Текущая локация</div>
+      <div id="current-zone-title">Центральный проход лаборатории</div>
+      <div id="current-zone-desc">Подойдите к любому столу или позовите инструктора</div>
+    </div>
+
+    <div class="hud-right-group">
+      <div class="toolbar">
+        <button class="hud-btn primary" id="btn-talk-instructor">🤖 Инструктор</button>
+        <button class="hud-btn" id="btn-open-map">🗺️ Карта (M)</button>
+        <button class="hud-btn" id="btn-toggle-sound">🔊 Звук: ВКЛ</button>
+      </div>
+      <div class="minimap-wrap" id="minimap-trigger" title="Нажмите, чтобы открыть карту лаборатории">
+        <canvas id="minimap-canvas" width="220" height="184"></canvas>
+        <div class="minimap-hint">Карта [M]</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="crosshair"></div>
+
+  <div id="interact-prompt">
+    <div class="prompt-info">
+      <div class="prompt-category" id="prompt-cat">Оборудование</div>
+      <div class="prompt-title" id="prompt-name">Аналитические весы</div>
+    </div>
+    <button class="btn-inspect" id="btn-inspect-now">Изучить [E]</button>
+  </div>
+
+  <div id="pointer-hint">Кликните по экрану, чтобы вращать камеру мышью • <b>ESC</b> — освободить курсор • <b>E</b> — изучить</div>
+</div>
+
+<!-- Облачко мыслей/реплик робота в 3D -->
+<div id="robot-bubble">Привет! Я робот-инструктор Атом.</div>
+
+<!-- Диалоговое окно Инструктора -->
+<div id="instructor-dialog">
+  <div class="dialog-header">
+    <div class="instructor-badge">
+      <div class="instructor-avatar">🤖</div>
+      <div>
+        <div class="instructor-name">Робот-инструктор «Атом»</div>
+        <div class="instructor-role">Лаборант-экскурсовод • ИИ-ассистент</div>
+      </div>
+    </div>
+    <button class="modal-close" id="btn-close-dialog">✕</button>
+  </div>
+  <div class="dialog-text" id="dialog-text">
+    Добро пожаловать в нашу лабораторию! Я могу провести для вас экскурсию по всем шести зонам, рассказать о ближайшем приборе или поделиться интересным фактом из мира аналитической и физической химии. Куда направимся?
+  </div>
+  <div class="dialog-actions" id="dialog-actions">
+    <button class="dialog-chip" data-action="tour-menu">🧭 Экскурсия по зонам</button>
+    <button class="dialog-chip" data-action="nearest">🔬 Расскажи о ближайшем приборе</button>
+    <button class="dialog-chip" data-action="fact">💡 Интересный научный факт</button>
+    <button class="dialog-chip" data-action="follow" id="btn-follow-toggle">🚶 Следуй за мной</button>
+  </div>
+</div>
+
+<!-- Модальное окно изучения прибора -->
+<div class="modal-overlay" id="equipment-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <span style="font-size:12px; font-weight:700; color:#0284c7; text-transform:uppercase;" id="modal-eq-zone">Зона</span>
+        <h2 id="modal-eq-title">Название прибора</h2>
+      </div>
+      <button class="modal-close" id="btn-close-eq-modal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="preview-panel">
+        <div id="preview-3d-box">
+          <div class="preview-rotate-tip">Потяните мышью или пальцем для вращения 3D-модели</div>
+        </div>
+        <div class="experiment-card">
+          <h4>🧪 Демонстрационный эксперимент</h4>
+          <div class="experiment-status" id="exp-status-text">Нажмите кнопку ниже, чтобы запустить прибор в действии.</div>
+          <button class="btn-experiment" id="btn-run-experiment">Запустить демонстрацию</button>
+        </div>
+      </div>
+      <div class="details-panel">
+        <div class="detail-block">
+          <h3>Назначение прибора</h3>
+          <p id="modal-eq-purpose"></p>
+        </div>
+        <div class="detail-block">
+          <h3>Основные части и конструкция</h3>
+          <ul id="modal-eq-parts"></ul>
+        </div>
+        <div class="detail-block">
+          <h3>Принцип работы</h3>
+          <p id="modal-eq-principle"></p>
+        </div>
+        <div class="detail-block">
+          <h3>Примеры использования в лаборатории</h3>
+          <p id="modal-eq-examples"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно карты лаборатории -->
+<div class="modal-overlay" id="map-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <span style="font-size:12px; font-weight:700; color:#0284c7; text-transform:uppercase;">Навигация</span>
+        <h2>Интерактивная карта химической лаборатории</h2>
+      </div>
+      <button class="modal-close" id="btn-close-map-modal">✕</button>
+    </div>
+    <div class="fullmap-body">
+      <div>
+        <canvas id="fullmap-canvas" width="600" height="440"></canvas>
+        <p style="font-size:12px; color:#64748b; margin-top:8px;">Нажмите на любую зону на схеме или в списке справа, чтобы мгновенно перейти к ней.</p>
+      </div>
+      <div class="zone-list" id="map-zone-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Мобильное сенсорное управление -->
+<div id="mobile-controls">
+  <div id="joystick-zone">
+    <div id="joystick-knob"></div>
+  </div>
+  <div id="touch-look-zone"></div>
+  <div class="mobile-action-btns">
+    <button class="mob-btn" id="mob-btn-inspect" style="background:#10b981; display:none;">🔬 Изучить</button>
+    <button class="mob-btn" id="mob-btn-instructor">🤖 Гид</button>
+  </div>
+</div>
+
+<!-- Подключение Three.js (r128 UMD для работы без сервера по протоколу file://) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ============================================================================
+// 1. ЗВУКОВОЙ СИНТЕЗАТОР (WEB AUDIO API)
+// ============================================================================
+const SoundFX = {
+  ctx: null,
+  enabled: true,
+  lastStepTime: 0,
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  },
+
+  playTone(freq, type = 'sine', duration = 0.15, volume = 0.12, slideTo = null) {
+    if (!this.enabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      if (slideTo) {
+        osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+      }
+      gain.gain.setValueAtTime(volume, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration);
+    } catch (e) {}
+  },
+
+  click() {
+    this.playTone(680, 'sine', 0.08, 0.1, 920);
+  },
+
+  step() {
+    if (!this.enabled || !this.ctx) return;
+    const now = performance.now();
+    if (now - this.lastStepTime < 440) return;
+    this.lastStepTime = now;
+    this.playTone(115 + Math.random() * 25, 'triangle', 0.07, 0.05, 65);
+  },
+
+  glassClink() {
+    this.playTone(1450, 'sine', 0.18, 0.09, 1800);
+    setTimeout(() => this.playTone(1950, 'sine', 0.14, 0.06), 60);
+  },
+
+  bubble() {
+    for (let i = 0; i < 4; i++) {
+      setTimeout(() => {
+        this.playTone(350 + i * 140, 'sine', 0.12, 0.08, 600 + i * 160);
+      }, i * 90);
+    }
+  },
+
+  motorSpin() {
+    this.playTone(140, 'sawtooth', 0.65, 0.07, 420);
+  },
+
+  beep() {
+    this.playTone(1046, 'sine', 0.12, 0.1);
+    setTimeout(() => this.playTone(1318, 'sine', 0.18, 0.1), 120);
+  },
+
+  robotGreet() {
+    this.playTone(520, 'triangle', 0.1, 0.1, 680);
+    setTimeout(() => this.playTone(780, 'triangle', 0.14, 0.1, 960), 110);
+  }
+};
+
+// ============================================================================
+// 2. БАЗА ДАННЫХ ЛАБОРАТОРНЫХ ЗОН И ОБОРУДОВАНИЯ (21 ПРИБОР)
+// ============================================================================
+const ZONES_DATA = [
+  {
+    id: 'analytical',
+    name: 'Зона аналитической химии',
+    shortName: 'Аналитика',
+    color: '#0284c7',
+    desc: 'Точное взвешивание, фотометрия и электрохимический анализ растворов',
+    bounds: { minX: -9.5, maxX: -2.5, minZ: -7.5, maxZ: -1.8 },
+    teleport: { x: -5.5, z: -2.4, rotY: 0 },
+    robotPos: { x: -3.2, z: -3.2 }
+  },
+  {
+    id: 'titration',
+    name: 'Зона титрования',
+    shortName: 'Титрование',
+    color: '#db2777',
+    desc: 'Объёмный анализ, работа с бюретками, пипетками и магнитными мешалками',
+    bounds: { minX: -9.5, maxX: -2.5, minZ: -1.5, maxZ: 4.5 },
+    teleport: { x: -5.5, z: 3.6, rotY: 0 },
+    robotPos: { x: -3.0, z: 2.5 }
+  },
+  {
+    id: 'physicochem',
+    name: 'Зона физико-химических исследований',
+    shortName: 'Физ-хим анализ',
+    color: '#d97706',
+    desc: 'Центрифугирование, микроскопия, прокаливание, сушка и дистилляция воды',
+    bounds: { minX: -3.8, maxX: 4.2, minZ: -9.2, maxZ: -4.2 },
+    teleport: { x: 0.0, z: -4.6, rotY: 0 },
+    robotPos: { x: 2.2, z: -5.0 }
+  },
+  {
+    id: 'solutions',
+    name: 'Зона приготовления растворов',
+    shortName: 'Растворы и посуда',
+    color: '#059669',
+    desc: 'Химические стаканы, пробирки, воронки и синтез стандартных растворов',
+    bounds: { minX: 1.5, maxX: 7.5, minZ: -4.2, maxZ: 1.5 },
+    teleport: { x: 4.2, z: 0.7, rotY: 0 },
+    robotPos: { x: 2.0, z: 0.2 }
+  },
+  {
+    id: 'storage',
+    name: 'Зона хранения реактивов и вытяжной шкаф',
+    shortName: 'Реактивы и тяга',
+    color: '#7c3aed',
+    desc: 'Работа с летучими веществами под тягой, шкафы реактивов и холодильник',
+    bounds: { minX: 7.6, maxX: 11.4, minZ: -7.5, maxZ: 4.0 },
+    teleport: { x: 8.2, z: -1.5, rotY: -Math.PI / 2 },
+    robotPos: { x: 8.0, z: -3.5 }
+  },
+  {
+    id: 'safety',
+    name: 'Зона безопасности',
+    shortName: 'Безопасность',
+    color: '#dc2626',
+    desc: 'Средства индивидуальной защиты, станция промывки глаз и пожарный пост',
+    bounds: { minX: 4.5, maxX: 11.2, minZ: 4.2, maxZ: 9.0 },
+    teleport: { x: 7.5, z: 4.8, rotY: Math.PI },
+    robotPos: { x: 5.5, z: 5.5 }
+  }
+];
+
+const EQUIPMENT_DATA = [
+  // --- ЗОНА 1: АНАЛИТИЧЕСКАЯ ХИМИЯ (Table 1: x=-5.5, z=-4.5) ---
+  {
+    id: 'analytical_balance',
+    name: 'Аналитические весы',
+    zoneId: 'analytical',
+    pos: { x: -7.1, y: 0.88, z: -4.5 },
+    purpose: 'Высокоточное определение массы твёрдых и жидких навесок с точностью до 0,0001 г (0,1 мг) при приготовлении титрованных растворов и гравиметрическом анализе.',
+    parts: [
+      'Ветрозащитная стеклянная витрина со сдвижными дверцами',
+      'Высокочувствительная взвешивающая чаша из нержавеющей стали',
+      'Электромагнитный компенсатор силы и тензодатчик',
+      'Цифровой ЖК-дисплей с кнопкой обнуления тары (TARE)',
+      'Пузырьковый уровень и регулируемые опоры корпуса'
+    ],
+    principle: 'Основан на электромагнитной компенсации: при помещении образца на чашу электромагнит создаёт противодействующую силу, пропорциональную току в катушке, который преобразуется в точное цифровое значение массы.',
+    examples: 'Взвешивание первичных стандартов (Na₂CO₃, K₂Cr₂O₇), определение массы осадка BaSO₄ после прокаливания в гравиметрии.',
+    expBtn: 'Взвесить навеску хлорида натрия',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.beep();
+      return state.active
+        ? '✅ Дверца закрыта. Стабилизация показаний... Масса навески NaCl составила: 1,2458 г (точность ±0,0001 г).'
+        : 'Весы обнулены (0,0000 г). Готовы к следующему измерению.';
+    }
+  },
+  {
+    id: 'technical_balance',
+    name: 'Технические весы',
+    zoneId: 'analytical',
+    pos: { x: -5.9, y: 0.88, z: -4.5 },
+    purpose: 'Быстрое взвешивание реактивов и вспомогательных материалов с точностью до 0,01–0,1 г, когда не требуется прецизионная точность аналитических весов.',
+    parts: [
+      'Широкая открытая платформа из коррозионностойкой стали',
+      'Тензометрический датчик нагрузки',
+      'Контрастный цифровой индикатор массы',
+      'Кнопки выбора единиц измерения (г, мг, карат) и тарирования'
+    ],
+    principle: 'Деформация упругого элемента тензодатчика под весом груза изменяет электрическое сопротивление тензорезисторов, что считывается микропроцессором.',
+    examples: 'Взвешивание солей для приготовления охлаждающих смесей, буферных растворов, навесок для синтеза.',
+    expBtn: 'Взвесить стакан с реактивом',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.beep();
+      return state.active
+        ? '⚖️ На платформу установлен стакан с CuSO₄·5H₂O. Результат: 48,35 г.'
+        : 'Платформа освобождена. Показания: 0,00 г.';
+    }
+  },
+  {
+    id: 'spectrophotometer',
+    name: 'Спектрофотометр (УФ-Вид)',
+    zoneId: 'analytical',
+    pos: { x: -4.7, y: 0.88, z: -4.5 },
+    purpose: 'Количественное определение концентрации окрашенных и бесцветных (в УФ-области) веществ в растворах по поглощению монохроматического света.',
+    parts: [
+      'Источники излучения (дейтериевая УФ-лампа и вольфрамовая галогенная лампа)',
+      'Монохроматор с дифракционной решёткой для выделения длины волны λ',
+      'Кюветное отделение для кварцевых или стеклянных кювет',
+      'Фотодиодный детектор и экран отображения спектра'
+    ],
+    principle: 'Работает по закону Бугера–Ламберта–Бера: оптическая плотность раствора A = ε·l·C прямо пропорциональна молярной концентрации поглощающего вещества.',
+    examples: 'Определение концентрации ионов железа(III) с сульфосалициловой кислотой, анализ белков, ДНК и красителей.',
+    expBtn: 'Измерить оптическую плотность (λ = 540 нм)',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.beep();
+      return state.active
+        ? '🌈 Луч λ = 540 нм прошёл через кювету с KMnO₄. Оптическая плотность A = 0,642; расчётная концентрация C = 0,00028 моль/л.'
+        : 'Кюветное отделение закрыто. Прибор в режиме ожидания.';
+    }
+  },
+  {
+    id: 'ph_meter',
+    name: 'Лабораторный pH-метр',
+    zoneId: 'analytical',
+    pos: { x: -3.6, y: 0.88, z: -4.5 },
+    purpose: 'Точное измерение водородного показателя (активности ионов H⁺) и окислительно-восстановительного потенциала жидких сред.',
+    parts: [
+      'Комбинированный стеклянный электрод с ионоселективной мембраной',
+      'Электрод сравнения (хлорсеребряный)',
+      'Шарнирный штатив-держатель электрода',
+      'Датчик автоматической термокомпенсации (ATC)',
+      'Измерительный блок с высокоомным вольтметром'
+    ],
+    principle: 'Потенциометрический метод: на тонкой стеклянной мембране возникает разность потенциалов, линейно зависящая от pH раствора согласно уравнению Нернста.',
+    examples: 'Контроль pH буферных растворов, потенциометрическое титрование кислот и оснований, анализ качества питьевой воды.',
+    expBtn: 'Погрузить электрод в исследуемый раствор',
+    expAction: (state) => {
+      state.step = ((state.step || 0) + 1) % 3;
+      SoundFX.bubble();
+      if (state.step === 1) return '🧪 Электрод в растворе HCl (0,01 М): измерено pH = 2,01 (сильнокислая среда, T = 25,0 °C).';
+      if (state.step === 2) return '💧 Электрод промыт и опущен в буфер: измерено pH = 7,00 (нейтральная среда).';
+      return '🧪 Электрод в растворе NaOH: измерено pH = 11,85 (щелочная среда).';
+    }
+  },
+
+  // --- ЗОНА 2: ТИТРОВАНИЕ (Table 2: x=-5.5, z=1.5) ---
+  {
+    id: 'titration_setup',
+    name: 'Титровальная установка',
+    zoneId: 'titration',
+    pos: { x: -7.1, y: 0.88, z: 1.5 },
+    purpose: 'Проведение объёмного титриметрического анализа для точного установления концентрации растворов по точке эквивалентности.',
+    parts: [
+      'Массивный штатив с белым фарфоровым основанием (для чёткой фиксации перехода окраски)',
+      'Лапка-держатель с пружинным зажимом',
+      'Градуированная стеклянная бюретка со стеклянным или тефлоновым краном',
+      'Коническая колба Эрленмейера с титруемым раствором и индикатором'
+    ],
+    principle: 'К известному объёму анализируемого раствора по каплям добавляют титрант известной концентрации до момента изменения окраски индикатора (точки конца титрования).',
+    examples: 'Кислотно-основное титрование (определение концентрации HCl раствором NaOH с фенолфталеином), комплексонометрия.',
+    expBtn: 'Добавить титрант NaOH до точки эквивалентности',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.bubble();
+      return state.active
+        ? '🌸 Израсходовано 14,60 мл 0,1 М NaOH! Бесцветный раствор в колбе стал устойчиво бледно-малиновым (фенолфталеин, pH 8,3).'
+        : 'Колба заменена на свежую пробу HCl с 2 каплями фенолфталеина (бесцветный раствор).';
+    }
+  },
+  {
+    id: 'burettes',
+    name: 'Бюретки на штативе',
+    zoneId: 'titration',
+    pos: { x: -6.0, y: 0.88, z: 1.5 },
+    purpose: 'Точное дозирование и отмеривание переменных объёмов титранта с ценой деления 0,05 или 0,1 мл.',
+    parts: [
+      'Узкая калиброванная стеклянная трубка с нанесением шкалы сверху вниз (от 0 до 25/50 мл)',
+      'Полоса Шельбаха (синяя линия на белом фоне для безошибочного отсчёта мениска)',
+      'Запорный кран или шариковый затвор Мора',
+      'Оттянутый капиллярный носик для формирования мелких капель'
+    ],
+    principle: 'Позволяет выливать жидкость небольшими порциями и определять израсходованный объём по разности начального и конечного уровней нижнего мениска.',
+    examples: 'Перманганатометрия (используют бюретки со стеклянным краном, так как KMnO₄ разрушает резину), алкалиметрия.',
+    expBtn: 'Считать показания по мениску',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.glassClink();
+      return state.active
+        ? '📏 Уровень нижнего мениска по полосе Шельбаха: ровно 12,45 мл. Пузырьки воздуха в носике отсутствуют.'
+        : 'Бюретка заполнена титрантом до нулевой отметки (0,00 мл).';
+    }
+  },
+  {
+    id: 'magnetic_stirrer',
+    name: 'Магнитная мешалка с подогревом',
+    zoneId: 'titration',
+    pos: { x: -4.9, y: 0.88, z: 1.5 },
+    purpose: 'Непрерывное и равномерное перемешивание жидкостей в закрытых или открытых сосудах с одновременным контролируемым нагревом.',
+    parts: [
+      'Керамическая или алюминиевая нагревательная платформа',
+      'Вращающийся постоянный магнит под поверхностью плиты',
+      'Тефлоновый (PTFE) магнитный якорь, помещаемый внутрь колбы',
+      'Регуляторы скорости вращения (об/мин) и температуры нагрева (°C)'
+    ],
+    principle: 'Вращающееся магнитное поле привода увлекает за собой магнитный якорь внутри сосуда, создавая устойчивую воронку перемешивания без контакта с внешней средой.',
+    examples: 'Растворение труднорастворимых солей, перемешивание при pH-метрическом титровании, органический синтез.',
+    expBtn: 'Включить перемешивание (800 об/мин) и нагрев',
+    expAction: (state) => {
+      state.active = !state.active;
+      if (state.active) SoundFX.motorSpin();
+      return state.active
+        ? '🌀 Магнитный якорь вращается со скоростью 800 об/мин! Образовалась глубокая воронка, нагрев платформы установлен на 65 °C.'
+        : 'Привод и нагрев выключены. Якорь остановился на дне стакана.';
+    }
+  },
+  {
+    id: 'volumetric_flasks',
+    name: 'Мерные колбы',
+    zoneId: 'titration',
+    pos: { x: -4.0, y: 0.88, z: 1.5 },
+    purpose: 'Приготовление растворов строго заданной молярной или нормальной концентрации и точное разбавление проб.',
+    parts: [
+      'Плоскодонный грушевидный корпус из боросиликатного стекла',
+      'Узкое длинное горло для высокой точности фиксации объёма',
+      'Кольцевая калибровочная метка (на 50, 100, 250 или 1000 мл при 20 °C)',
+      'Притёртая стеклянная или полипропиленовая пробка'
+    ],
+    principle: 'Благодаря малому диаметру горла добавление даже одной капли воды вызывает заметное смещение мениска относительно кольцевой метки.',
+    examples: 'Приготовление стандартного раствора трилона Б, разбавление аликвоты для фотометрического анализа.',
+    expBtn: 'Довести раствор до кольцевой метки',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.glassClink();
+      return state.active
+        ? '💧 Дистиллированная вода добавлена по каплям пипеткой: нижний край мениска точно касается метки 250,0 мл. Раствор перемешан!'
+        : 'Мерная колба готова к растворению новой навески.';
+    }
+  },
+  {
+    id: 'pipettes',
+    name: 'Пипетки (Мора и автоматические)',
+    zoneId: 'titration',
+    pos: { x: -3.4, y: 0.88, z: 1.5 },
+    purpose: 'Отбор и перенос точных объёмов (аликвот) жидкостей от микролитров до десятков миллилитров.',
+    parts: [
+      'Стеклянные пипетки Мора с расширением и одной меткой',
+      'Градуированные пипетки для дробных объёмов',
+      'Автоматический микродозатор со сменными стерильными наконечниками',
+      'Резиновая груша или пипетатор (запрещено набирать реактивы ртом!)'
+    ],
+    principle: 'Стеклянные пипетки удерживают жидкость за счёт разрежения и капиллярных сил; микродозаторы используют поршневой воздушный вытеснитель.',
+    examples: 'Отбор аликвоты 10,00 мл раствора для титрования, дозирование 200 мкл реагента в кювету.',
+    expBtn: 'Отобрать аликвоту 10,00 мл',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.bubble();
+      return state.active
+        ? '💉 С помощью пипетатора набрано ровно 10,00 мл раствора и перенесено в коническую колбу.'
+        : 'Пипетка промыта дистиллированной водой и помещена в штатив.';
+    }
+  },
+
+  // --- ЗОНА 3: ФИЗИКО-ХИМИЧЕСКИЕ ИССЛЕДОВАНИЯ (Table 3: x=0.0, z=-6.8) ---
+  {
+    id: 'centrifuge',
+    name: 'Лабораторная центрифуга',
+    zoneId: 'physicochem',
+    pos: { x: -2.4, y: 0.88, z: -6.8 },
+    purpose: 'Быстрое разделение неоднородных жидких систем (суспензий и эмульсий) на осадок и надосадочную жидкость (супернатант) под действием центробежной силы.',
+    parts: [
+      'Прочный металлический корпус с защитной блокировкой крышки',
+      'Угловой или бакет-ротор с гнездами для пробирок',
+      'Бесщёточный высокооборотный электродвигатель',
+      'Цифровая панель задания скорости (об/мин) и таймера'
+    ],
+    principle: 'При быстром вращении ротора более плотные частицы осадка отбрасываются к дну пробирки с ускорением, в тысячи раз превышающим ускорение свободного падения (g).',
+    examples: 'Отделение кристаллического осадка от маточного раствора, фракционирование крови и клеточных органелл.',
+    expBtn: 'Запустить центрифугирование (4500 об/мин)',
+    expAction: (state) => {
+      state.active = !state.active;
+      if (state.active) SoundFX.motorSpin();
+      return state.active
+        ? '🔄 Крышка заблокирована! Ротор разогнался до 4500 об/мин. Суспензия разделилась на плотный белый осадок и прозрачный супернатант!'
+        : 'Ротор полностью остановлен. Крышка разблокирована для извлечения пробирок.';
+    }
+  },
+  {
+    id: 'microscope',
+    name: 'Оптический лабораторный микроскоп',
+    zoneId: 'physicochem',
+    pos: { x: -1.2, y: 0.88, z: -6.8 },
+    purpose: 'Изучение микроструктуры кристаллов, осадков, порошков и биологических объектов с увеличением от 40× до 1000×.',
+    parts: [
+      'Бинокулярная насадка с широкопольными окулярами (10×)',
+      'Револьверное устройство с ахроматическими объективами (4×, 10×, 40×, 100×)',
+      'Предметный столик с препаратоводителем и зажимами',
+      'Конденсор Аббе с ирисовой диафрагмой и светодиодный осветитель',
+      'Винты грубой (макро) и точной (микро) фокусировки'
+    ],
+    principle: 'Двухступенчатая оптическая система: объектив формирует увеличенное действительное изображение образца, которое дополнительно увеличивается окуляром.',
+    examples: 'Микрокристаллоскопический анализ катионов, проверка чистоты и формы кристаллов после перекристаллизации.',
+    expBtn: 'Изучить кристаллы медного купороса (400×)',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.click();
+      return state.active
+        ? '🔬 Фокус наведён (увеличение 400×): отчётливо видны ярко-синие триклинные кристаллы пентагидрата сульфата меди CuSO₄·5H₂O!'
+        : 'Подсветка переведена в дежурный режим.';
+    }
+  },
+  {
+    id: 'muffle_furnace',
+    name: 'Муфельная печь',
+    zoneId: 'physicochem',
+    pos: { x: 0.0, y: 0.88, z: -6.8 },
+    purpose: 'Высокотемпературная термическая обработка, прокаливание осадков, озоление проб и плавка при температурах от 300 °C до 1100 °C.',
+    parts: [
+      'Рабочая камера (муфель) из огнеупорной керамики, изолирующая образец от спиралей',
+      'Нагревательные элементы из фехрали или карбида кремния',
+      'Толстый слой базальтовой теплоизоляции и дверца с концевым выключателем',
+      'ПИД-регулятор температуры с термопарой (харомель-алюмель)'
+    ],
+    principle: 'Электрический ток разогревает спирали вокруг керамического муфеля, обеспечивая равномерный радиационный и конвективный прогрев тиглей до 1000+ °C.',
+    examples: 'Прокаливание осадка BaSO₄ в фарфоровом тигле до постоянной массы, определение зольности органических веществ.',
+    expBtn: 'Нагреть камеру до 850 °C',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.beep();
+      return state.active
+        ? '🔥 Нагреватели включены! Температура в муфельной камере достигла 850 °C. Внутри стоит фарфоровый тигель.'
+        : 'Нагрев отключён. Печь плавно остывает (дверцу запрещено открывать выше 200 °C!).';
+    }
+  },
+  {
+    id: 'drying_oven',
+    name: 'Лабораторный сушильный шкаф',
+    zoneId: 'physicochem',
+    pos: { x: 1.3, y: 0.88, z: -6.8 },
+    purpose: 'Высушивание лабораторной посуды, удаление влаги из химических реактивов и определение влажности образцов при 50–250 °C.',
+    parts: [
+      'Рабочая камера из нержавеющей стали с перфорированными полками',
+      'Трубчатые электронагреватели (ТЭНы) и вентилятор конвекции',
+      'Вентиляционная заслонка для отвода водяных паров',
+      'Цифровой термоконтроллер с защитой от перегрева'
+    ],
+    principle: 'Принудительная конвекция горячего воздуха равномерно прогревает внутренний объём камеры и уносит испаряющуюся влагу через вытяжное отверстие.',
+    examples: 'Сушка стеклянной посуды, высушивание первичных стандартов до постоянной массы при 105–110 °C.',
+    expBtn: 'Установить режим сушки 105 °C',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.motorSpin();
+      return state.active
+        ? '🌡️ Вентилятор конвекции работает. Температура стабилизирована на уровне 105,0 °C — идёт удаление гигроскопической влаги.'
+        : 'Сушильный шкаф выключен.';
+    }
+  },
+  {
+    id: 'distiller',
+    name: 'Аквадистиллятор',
+    zoneId: 'physicochem',
+    pos: { x: 2.5, y: 0.88, z: -6.8 },
+    purpose: 'Получение очищенной дистиллированной воды, свободной от растворённых солей, газов и органических примесей.',
+    parts: [
+      'Испарительный котёл с электронагревателями и датчиком уровня воды',
+      'Каплеуловитель (сепаратор) для защиты от брызгоуноса',
+      'Конденсатор-холодильник со змеевиком, охлаждаемым проточной водой',
+      'Приёмная бутыль для сбора дистиллята'
+    ],
+    principle: 'Вода доводится до кипения, образующийся пар поднимается в охлаждаемый конденсатор, где снова превращается в чистую воду, а соли остаются в испарителе.',
+    examples: 'Приготовление всех аналитических растворов, ополаскивание химической посуды после мытья.',
+    expBtn: 'Запустить перегонку воды',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.bubble();
+      return state.active
+        ? '💧 Вода в испарителе кипит! В приёмник поступает чистый дистиллят (удельная электропроводность < 2 мкСм/см).'
+        : 'Подача воды и нагрев ТЭНов прекращены.';
+    }
+  },
+
+  // --- ЗОНА 4: ПРИГОТОВЛЕНИЕ РАСТВОРОВ (Table 4: x=4.2, z=-1.5) ---
+  {
+    id: 'erlenmeyer_flasks',
+    name: 'Колбы Эрленмейера (конические)',
+    zoneId: 'solutions',
+    pos: { x: 2.6, y: 0.88, z: -1.5 },
+    purpose: 'Проведение титрования, перемешивание растворов круговыми движениями без разбрызгивания, нагревание и кипячение жидкостей.',
+    parts: [
+      'Широкое плоское дно для устойчивости на столе и плитке',
+      'Конические сужающиеся стенки, препятствующие выплёскиванию жидкости',
+      'Цилиндрическое горло (под пробку или обратный холодильник)',
+      'Ориентировочная градуировочная шкала объёма на стенке'
+    ],
+    principle: 'Коническая геометрия направляет брызги при энергичном взбалтывании обратно ко дну, а также уменьшает площадь испарения при нагреве.',
+    examples: 'Приёмная колба при любом титровании, выращивание кристаллов, хранение растворов.',
+    expBtn: 'Перемешать раствор в колбе',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.glassClink();
+      return state.active
+        ? '🧪 Раствор энергично перемешан круговым движением кисти — ни одна капля не выплеснулась благодаря коническим стенкам!'
+        : 'Колба установлена на лабораторный стол.';
+    }
+  },
+  {
+    id: 'beakers',
+    name: 'Химические стаканы',
+    zoneId: 'solutions',
+    pos: { x: 3.7, y: 0.88, z: -1.5 },
+    purpose: 'Растворение твёрдых веществ, смешивание реактивов, нагревание жидкостей на водяной бане и проведение качественных реакций.',
+    parts: [
+      'Цилиндрический корпус из термостойкого боросиликатного стекла (типа Pyrex)',
+      'Носик для аккуратного переливания жидкости по стеклянной палочке',
+      'Плоское устойчивое дно',
+      'Ориентировочная шкала объёма (50, 100, 250, 500, 1000 мл)'
+    ],
+    principle: 'Универсальный реакционный сосуд с широким горлом, удобным для перемешивания стеклянной палочкой и погружения электродов или термометра.',
+    examples: 'Растворение навески соли перед переносом в мерную колбу, осаждение гидроксидов.',
+    expBtn: 'Смешать сульфат меди и аммиак',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.bubble();
+      return state.active
+        ? '💙 Голубой раствор CuSO₄ при добавлении избытка NH₃ превратился в ярко-васильковый комплекс [Cu(NH₃)₄]²⁺!'
+        : 'В стакане находится исходный водный раствор сульфата меди(II).';
+    }
+  },
+  {
+    id: 'test_tubes',
+    name: 'Пробирки и штативы',
+    zoneId: 'solutions',
+    pos: { x: 4.8, y: 0.88, z: -1.5 },
+    purpose: 'Проведение качественных микрохимических реакций, наблюдение за изменением цвета, выпадением осадков и выделением газов.',
+    parts: [
+      'Тонкостенные цилиндрические стеклянные пробирки с полусферическим дном',
+      'Лабораторный штатив с гнёздами и штырями для сушки перевёрнутых пробирок',
+      'Деревянный или металлический держатель для нагревания на горелке'
+    ],
+    principle: 'Малый объём (1–5 мл) позволяет экономить реактивы и быстро визуально сравнивать серию параллельных опытов в одном штативе.',
+    examples: 'Качественный анализ катионов и анионов, тестирование индикаторов, сбор фракций.',
+    expBtn: 'Провести серию качественных реакций',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.glassClink();
+      return state.active
+        ? '🌈 В 1-й пробирке выпал жёлтый осадок PbI₂ («золотой дождь»), во 2-й — белый творожистый AgCl, в 3-й — малиновый комплекс!'
+        : 'Пробирки вымыты и установлены в штатив.';
+    }
+  },
+  {
+    id: 'funnels',
+    name: 'Лабораторные и делительные воронки',
+    zoneId: 'solutions',
+    pos: { x: 5.8, y: 0.88, z: -1.5 },
+    purpose: 'Переливание жидкостей в узкогорлую посуду, фильтрование осадков через бумажные фильтры и жидкостная экстракция несмешивающихся жидкостей.',
+    parts: [
+      'Коническая стеклянная воронка с углом конуса 60° и скошенным концом трубки',
+      'Складчатый или гладкий беззольный бумажный фильтр',
+      'Делительная воронка грушевидной формы с притёртой пробкой и краном',
+      'Кольцо штатива для фиксации воронки'
+    ],
+    principle: 'При фильтровании твёрдая фаза задерживается порами фильтра, а фильтрат стекает по стенке стакана. В делительной воронке жидкости расслаиваются по плотности.',
+    examples: 'Отделение осадка BaSO₄ перед прокаливанием, экстракция йода из воды в хлороформ или гексан.',
+    expBtn: 'Разделить две несмешивающиеся жидкости',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.bubble();
+      return state.active
+        ? '🧪 После встряхивания и отстаивания нижний органический слой (окрашенный йодом в фиолетовый) аккуратно слит через кран!'
+        : 'Кран делительной воронки перекрыт.';
+    }
+  },
+
+  // --- ЗОНА 5: ХРАНЕНИЕ РЕАКТИВОВ И ВЫТЯЖНОЙ ШКАФ (East Wall: x=10.5) ---
+  {
+    id: 'fume_hood',
+    name: 'Вытяжной шкаф',
+    zoneId: 'storage',
+    pos: { x: 10.2, y: 0.88, z: -5.2 },
+    purpose: 'Защита исследователя от токсичных, едких, летучих и дурнопахнущих газов, паров и аэрозолей во время химических реакций.',
+    parts: [
+      'Рабочая камера с химически стойкой столешницей и бортиком от проливов',
+      'Подъёмный защитный экран из закалённого триплекс-стекла с противовесом',
+      'Вытяжной воздуховод с кислотостойким вентилятором',
+      'Подвод воды, сливная раковина, газовый кран и взрывозащищённое освещение'
+    ],
+    principle: 'Создаёт направленный поток воздуха внутрь камеры со скоростью 0,5–0,8 м/с при опущенной створке, полностью исключая выход паров в помещение.',
+    examples: 'Работа с концентрированными HCl, HNO₃, H₂SO₄, раствором аммиака, упаривание кислот и синтез газов.',
+    expBtn: 'Включить вытяжку и открыть конц. HCl',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.motorSpin();
+      return state.active
+        ? '💨 Вытяжной вентилятор работает на полную мощность! Пары HCl и белый дымок NH₄Cl мгновенно уносятся в вентиляцию.'
+        : 'Защитный экран опущен, вытяжка переведена в дежурный режим.';
+    }
+  },
+  {
+    id: 'reagent_cabinets',
+    name: 'Шкафы с химическими реактивами',
+    zoneId: 'storage',
+    pos: { x: 10.4, y: 0.9, z: -1.2 },
+    purpose: 'Систематизированное и безопасное хранение неорганических и органических реактивов с соблюдением правил химической совместимости.',
+    parts: [
+      'Герметичные секции с раздельным хранением кислот, щелочей и солей',
+      'Склянки из тёмного янтарного стекла для светочувствительных веществ (AgNO₃, KMnO₄)',
+      'Чёткая маркировка с формулой, квалификацией чистоты (ХЧ, ЧДА, ОСЧ) и пиктограммами СГС',
+      'Поддоны для локализации случайных проливов'
+    ],
+    principle: 'Разделение несовместимых классов веществ (например, окислителей и восстановителей, кислот и цианидов/сульфидов) предотвращает опасные реакции при хранении.',
+    examples: 'Хранение индикаторов, стандарт-титров (фиксаналов), солей металлов и органических растворителей.',
+    expBtn: 'Проверить маркировку реактивов',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.glassClink();
+      return state.active
+        ? '📋 Проверено: AgNO₃ и KMnO₄ хранятся в тёмных склянках; кислоты изолированы от щелочей; все этикетки соответствуют ГОСТ.'
+        : 'Дверцы шкафа реактивов плотно закрыты.';
+    }
+  },
+  {
+    id: 'reagent_fridge',
+    name: 'Лабораторный холодильник для реактивов',
+    zoneId: 'storage',
+    pos: { x: 10.4, y: 0.9, z: 2.2 },
+    purpose: 'Хранение термолабильных реактивов, ферментов, стандартных растворов и летучих органических соединений при температуре +2…+8 °C.',
+    parts: [
+      'Безыскровая внутренняя камера (защита от воспламенения паров ЛВЖ)',
+      'Цифровой термостат с точностью поддержания температуры ±0,5 °C',
+      'Принудительная циркуляция охлаждённого воздуха по полкам',
+      'Звуковая сигнализация при отклонении температуры или незакрытой дверце'
+    ],
+    principle: 'Понижение температуры замедляет скорость термического разложения, окисления и испарения чувствительных химических и биохимических препаратов.',
+    examples: 'Хранение пероксида водорода, перегнанных растворителей, буферных стандартов и биологических проб.',
+    expBtn: 'Проверить температурный режим',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.beep();
+      return state.active
+        ? '❄️ Температура внутри камеры: +4,2 °C. Внутреннее освещение и безыскровая защита в норме.'
+        : 'Дверца холодильника закрыта.';
+    }
+  },
+
+  // --- ЗОНА 6: БЕЗОПАСНОСТЬ (Front-Right: x=7.5, z=6.8) ---
+  {
+    id: 'safety_station',
+    name: 'Станция безопасности и СИЗ',
+    zoneId: 'safety',
+    pos: { x: 7.5, y: 0.9, z: 6.8 },
+    purpose: 'Обеспечение исследователей средствами индивидуальной защиты (СИЗ) и оказание экстренной помощи при попадании реактивов на кожу или в глаза.',
+    parts: [
+      'Фонтанчик для экстренной промывки глаз с двойными распылителями',
+      'Шкаф со средствами защиты: хлопчатобумажный халат, защитные очки, нитриловые перчатки',
+      'Углекислотный огнетушитель (ОУ-5) и кошма (противопожарное полотно)',
+      'Лабораторная аптечка первой помощи с нейтрализующими растворами'
+    ],
+    principle: 'При попадании кислоты или щёлочи немедленное обильное промывание водой в течение 15 минут разбавляет и смывает агрессивное вещество до развития химического ожога.',
+    examples: 'Обязательное надевание халата и очков перед входом в рабочую зону; проверка исправности фонтанчика раз в неделю.',
+    expBtn: 'Проверить фонтанчик для промывки глаз',
+    expAction: (state) => {
+      state.active = !state.active;
+      SoundFX.bubble();
+      return state.active
+        ? '🚿 Аварийный фонтанчик исправен: подаются две мягкие аэрированные струи чистой воды комфортной температуры!'
+        : 'Клапан аварийного фонтанчика перекрыт. СИЗ готовы к использованию.';
+    }
+  }
+];
+
+const ROBOT_FACTS = [
+  'Знаете ли вы? Боросиликатное стекло (пирекс), из которого делают колбы и стаканы, содержит около 13% оксида бора B₂O₃. Благодаря этому оно почти не расширяется при нагреве и выдерживает резкие перепады температур!',
+  'Интересный факт: Полоса Шельбаха на задней стенке бюретки — это синяя вертикальная линия на белом фоне. Из-за преломления света в жидкости она визуально сужается в месте мениска в два острия, позволяя считывать объём с точностью до 0,02 мл.',
+  'Почему в лаборатории запрещено пить и есть из химической посуды? Даже после многократного мытья в микропорах стекла могут сохраняться следы тяжёлых металлов или индикаторов.',
+  'Аналитические весы настолько чувствительны (0,0001 г), что даже тепло руки исследователя или лёгкий сквозняк создают конвекционные потоки воздуха, способные исказить результат взвешивания!',
+  'При разбавлении концентрированной серной кислоты всегда льют кислоту в воду тонкой струйкой при перемешивании, а не наоборот — иначе верхний слой воды мгновенно вскипит от выделяющейся теплоты гидратации.'
+];
+
+// ============================================================================
+// 3. ГЕНЕРАЦИЯ ПРОЦЕДУРНЫХ ТЕКСТУР (КЕРАМОГРАНИТ, ГРАФИТ, ДЕРЕВО, СТЕНДЫ)
+// ============================================================================
+function createFloorTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Контрастный графитово-серый лабораторный керамогранит
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Чередующиеся оттенки плитки для объёма
+  ctx.fillStyle = '#3f4d61';
+  ctx.fillRect(3, 3, 250, 250);
+  ctx.fillRect(259, 259, 250, 250);
+
+  ctx.fillStyle = '#4e5d73';
+  ctx.fillRect(259, 3, 250, 250);
+  ctx.fillRect(3, 259, 250, 250);
+
+  // Мелкая минеральная крошка эпоксидно-керамического покрытия
+  for (let i = 0; i < 1400; i++) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.12)';
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  // Тёмные межплиточные швы
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(0, 0, 256, 256);
+  ctx.strokeRect(256, 0, 256, 256);
+  ctx.strokeRect(0, 256, 256, 256);
+  ctx.strokeRect(256, 256, 256, 256);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(12, 10);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+function createGraphiteTopTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Тёмно-антрацитовая химически стойкая столешница
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(0, 0, 512, 512);
+
+  for (let i = 0; i < 2000; i++) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    ctx.fillStyle = i % 3 === 0 ? 'rgba(148,163,184,0.08)' : 'rgba(15,23,42,0.22)';
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  // Тонкая координатная сетка рабочей поверхности
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+  ctx.lineWidth = 1;
+  for (let p = 64; p < 512; p += 64) {
+    ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, 512); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(512, p); ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 1);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+function createWoodTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  // Тёплый мебельный дуб / бук
+  ctx.fillStyle = '#b08968';
+  ctx.fillRect(0, 0, 256, 256);
+
+  for (let y = 0; y < 256; y += 3) {
+    ctx.fillStyle = y % 6 === 0 ? 'rgba(127, 85, 57, 0.25)' : 'rgba(221, 184, 146, 0.18)';
+    ctx.fillRect(0, y, 256, 2);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+function createPeriodicTableTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 600;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 1024, 600);
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 12;
+  ctx.strokeRect(6, 6, 1012, 588);
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = 'bold 28px Segoe UI, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('ПЕРИОДИЧЕСКАЯ СИСТЕМА ХИМИЧЕСКИХ ЭЛЕМЕНТОВ Д. И. МЕНДЕЛЕЕВА', 512, 48);
+
+  const colors = ['#fecdd3', '#fed7aa', '#fef08a', '#bbf7d0', '#bae6fd', '#ddd6fe'];
+  const symbols = [
+    ['H',1,0,0], ['He',2,17,0],
+    ['Li',3,0,1], ['Be',4,1,1], ['B',5,12,1], ['C',6,13,1], ['N',7,14,1], ['O',8,15,1], ['F',9,16,1], ['Ne',10,17,1],
+    ['Na',11,0,2], ['Mg',12,1,2], ['Al',13,12,2], ['Si',14,13,2], ['P',15,14,2], ['S',16,15,2], ['Cl',17,16,2], ['Ar',18,17,2]
+  ];
+
+  const startX = 48, startY = 75, cellW = 51, cellH = 58;
+  for (let r = 0; r < 7; r++) {
+    for (let c = 0; c < 18; c++) {
+      if (r === 0 && c > 0 && c < 17) continue;
+      if ((r === 1 || r === 2) && c > 1 && c < 12) continue;
+      const x = startX + c * cellW;
+      const y = startY + r * cellH;
+      const colorIdx = c < 2 ? 0 : (c < 12 ? 2 : (c === 17 ? 5 : 4));
+      ctx.fillStyle = colors[colorIdx];
+      ctx.fillRect(x + 2, y + 2, cellW - 4, cellH - 4);
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + 2, y + 2, cellW - 4, cellH - 4);
+    }
+  }
+
+  symbols.forEach(([sym, num, c, r]) => {
+    const x = startX + c * cellW;
+    const y = startY + r * cellH;
+    ctx.fillStyle = '#334155';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(num, x + 6, y + 15);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(sym, x + cellW / 2, y + 40);
+  });
+
+  for (let r = 0; r < 2; r++) {
+    for (let c = 0; c < 14; c++) {
+      const x = startX + (c + 2) * cellW;
+      const y = startY + (7.3 + r) * cellH;
+      ctx.fillStyle = r === 0 ? '#a7f3d0' : '#fde68a';
+      ctx.fillRect(x + 2, y + 2, cellW - 4, cellH - 6);
+      ctx.strokeStyle = '#475569';
+      ctx.strokeRect(x + 2, y + 2, cellW - 4, cellH - 6);
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+function createBannerTexture(title, subtitle, colorHex) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 140;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(4, 4, 504, 132);
+
+  ctx.strokeStyle = colorHex;
+  ctx.lineWidth = 8;
+  ctx.strokeRect(8, 8, 496, 124);
+
+  ctx.fillStyle = colorHex;
+  ctx.fillRect(8, 8, 496, 18);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 25px Segoe UI, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(title, 256, 70);
+
+  ctx.fillStyle = '#bae6fd';
+  ctx.font = '18px Segoe UI, sans-serif';
+  ctx.fillText(subtitle, 256, 106);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+// ============================================================================
+// 4. БИБЛИОТЕКА РАЗНОРОДНЫХ МАТЕРИАЛОВ И 3D-МОДЕЛИ ПРИБОРОВ
+// ============================================================================
+const Materials = {
+  // Металлы
+  brushedSteel: new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.22, metalness: 0.85 }),
+  chrome: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.12, metalness: 0.94 }),
+  darkGunmetal: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.38, metalness: 0.68 }),
+  anodizedBlue: new THREE.MeshStandardMaterial({ color: 0x0369a1, roughness: 0.30, metalness: 0.55 }),
+  tealEnamel: new THREE.MeshStandardMaterial({ color: 0x0f766e, roughness: 0.28, metalness: 0.45 }),
+
+  // Лабораторный пластик и керамика
+  ivoryPlastic: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.45, metalness: 0.05 }),
+  warmBeigePlastic: new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.48, metalness: 0.04 }),
+  graphiteTop: new THREE.MeshStandardMaterial({ map: createGraphiteTopTexture(), roughness: 0.36, metalness: 0.12 }),
+  woodOak: new THREE.MeshStandardMaterial({ map: createWoodTexture(), roughness: 0.55, metalness: 0.04 }),
+
+  // Экраны и индикаторы
+  cyanGlow: new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.75 }),
+  screenGreen: new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x059669, emissiveIntensity: 0.7 }),
+  safetyRed: new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.32, metalness: 0.2 }),
+
+  // Стекло с глянцевым бликом
+  glass: new THREE.MeshPhysicalMaterial({
+    color: 0xdbeafe,
+    transparent: true,
+    opacity: 0.42,
+    roughness: 0.06,
+    metalness: 0.05,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.05,
+    reflectivity: 1.0
+  }),
+  amberGlass: new THREE.MeshPhysicalMaterial({
+    color: 0xb45309,
+    transparent: true,
+    opacity: 0.78,
+    roughness: 0.10,
+    metalness: 0.05,
+    clearcoat: 0.9
+  }),
+
+  // Цветные химические растворы
+  liqBlue: new THREE.MeshStandardMaterial({ color: 0x0284c7, transparent: true, opacity: 0.85, roughness: 0.1 }),
+  liqPink: new THREE.MeshStandardMaterial({ color: 0xdb2777, transparent: true, opacity: 0.85, roughness: 0.1 }),
+  liqOrange: new THREE.MeshStandardMaterial({ color: 0xea580c, transparent: true, opacity: 0.85, roughness: 0.1 }),
+  liqGreen: new THREE.MeshStandardMaterial({ color: 0x059669, transparent: true, opacity: 0.85, roughness: 0.1 }),
+  liqPurple: new THREE.MeshStandardMaterial({ color: 0x7e22ce, transparent: true, opacity: 0.85, roughness: 0.1 }),
+  liqClear: new THREE.MeshStandardMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.65, roughness: 0.05 })
+};
+
+function createErlenmeyerMesh(liqMat) {
+  const g = new THREE.Group();
+  const pts = [
+    new THREE.Vector2(0.0, 0.0),
+    new THREE.Vector2(0.11, 0.0),
+    new THREE.Vector2(0.035, 0.22),
+    new THREE.Vector2(0.035, 0.29),
+    new THREE.Vector2(0.042, 0.295)
+  ];
+  const glass = new THREE.Mesh(new THREE.LatheGeometry(pts, 24), Materials.glass);
+  g.add(glass);
+
+  if (liqMat) {
+    const lPts = [
+      new THREE.Vector2(0.0, 0.005),
+      new THREE.Vector2(0.102, 0.005),
+      new THREE.Vector2(0.068, 0.10)
+    ];
+    const liq = new THREE.Mesh(new THREE.LatheGeometry(lPts, 24), liqMat);
+    g.add(liq);
+  }
+  return g;
+}
+
+function createVolumetricFlaskMesh(liqMat) {
+  const g = new THREE.Group();
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.095, 20, 16), Materials.glass);
+  bulb.position.y = 0.095;
+  g.add(bulb);
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.18, 16), Materials.glass);
+  neck.position.y = 0.26;
+  g.add(neck);
+
+  const mark = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.0022, 8, 20), Materials.anodizedBlue);
+  mark.rotation.x = Math.PI / 2;
+  mark.position.y = 0.27;
+  g.add(mark);
+
+  const stopper = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.016, 0.035, 14), Materials.anodizedBlue);
+  stopper.position.y = 0.36;
+  g.add(stopper);
+
+  if (liqMat) {
+    const liq = new THREE.Mesh(new THREE.SphereGeometry(0.088, 18, 14), liqMat);
+    liq.position.y = 0.095;
+    g.add(liq);
+  }
+  return g;
+}
+
+function createBeakerMesh(radius, height, liqMat) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 0.96, height, 22, 1, true), Materials.glass);
+  body.position.y = height / 2;
+  g.add(body);
+
+  const bottom = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.96, 22), Materials.glass);
+  bottom.rotation.x = -Math.PI / 2;
+  bottom.position.y = 0.004;
+  g.add(bottom);
+
+  if (liqMat) {
+    const liqH = height * 0.62;
+    const liq = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.93, radius * 0.92, liqH, 20), liqMat);
+    liq.position.y = liqH / 2 + 0.006;
+    g.add(liq);
+  }
+  return g;
+}
+
+function buildEquipmentModel(id) {
+  const group = new THREE.Group();
+
+  switch (id) {
+    case 'analytical_balance': {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.09, 0.44), Materials.ivoryPlastic);
+      base.position.y = 0.045;
+      group.add(base);
+      const frontPanel = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.02), Materials.anodizedBlue);
+      frontPanel.position.set(0, 0.045, 0.215);
+      group.add(frontPanel);
+      const display = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.035), Materials.screenGreen);
+      display.position.set(-0.04, 0.048, 0.227);
+      group.add(display);
+      const chamber = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.30, 0.32), Materials.glass);
+      chamber.position.set(0, 0.24, -0.02);
+      group.add(chamber);
+      const topFrame = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.024, 0.34), Materials.darkGunmetal);
+      topFrame.position.set(0, 0.39, -0.02);
+      group.add(topFrame);
+      const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.07, 0.012, 24), Materials.chrome);
+      pan.position.set(0, 0.11, -0.02);
+      group.add(pan);
+      break;
+    }
+
+    case 'technical_balance': {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.08, 0.34), Materials.darkGunmetal);
+      body.position.y = 0.04;
+      group.add(body);
+      const bezel = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.065, 0.02), Materials.ivoryPlastic);
+      bezel.position.set(0, 0.04, 0.165);
+      group.add(bezel);
+      const display = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.03), Materials.cyanGlow);
+      display.position.set(0, 0.045, 0.177);
+      group.add(display);
+      const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.10, 0.015, 24), Materials.brushedSteel);
+      pan.position.set(0, 0.095, -0.02);
+      group.add(pan);
+      break;
+    }
+
+    case 'spectrophotometer': {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.24, 0.42), Materials.ivoryPlastic);
+      body.position.y = 0.12;
+      group.add(body);
+      const sideTrim = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.07, 0.43), Materials.anodizedBlue);
+      sideTrim.position.y = 0.04;
+      group.add(sideTrim);
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.05, 0.26), Materials.darkGunmetal);
+      lid.position.set(-0.08, 0.25, 0.04);
+      group.add(lid);
+      const screenFrame = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.14, 0.04), Materials.darkGunmetal);
+      screenFrame.position.set(0.14, 0.26, 0.08);
+      screenFrame.rotation.x = -0.35;
+      group.add(screenFrame);
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.11), Materials.screenGreen);
+      screen.position.set(0.14, 0.265, 0.102);
+      screen.rotation.x = -0.35;
+      group.add(screen);
+      break;
+    }
+
+    case 'ph_meter': {
+      const meter = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.10, 0.26), Materials.tealEnamel);
+      meter.position.set(-0.06, 0.05, 0);
+      group.add(meter);
+      const disp = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.05), Materials.cyanGlow);
+      disp.position.set(-0.06, 0.102, 0.02);
+      disp.rotation.x = -Math.PI / 2;
+      group.add(disp);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.36, 12), Materials.chrome);
+      rod.position.set(0.10, 0.18, -0.05);
+      group.add(rod);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.018, 0.02), Materials.darkGunmetal);
+      arm.position.set(0.13, 0.30, 0.01);
+      group.add(arm);
+      const electrode = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.22, 12), Materials.glass);
+      electrode.position.set(0.17, 0.21, 0.06);
+      group.add(electrode);
+      const beaker = createBeakerMesh(0.055, 0.12, Materials.liqBlue);
+      beaker.position.set(0.17, 0, 0.06);
+      group.add(beaker);
+      break;
+    }
+
+    case 'titration_setup': {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.025, 0.34), Materials.ivoryPlastic);
+      base.position.y = 0.0125;
+      group.add(base);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.72, 12), Materials.chrome);
+      rod.position.set(0, 0.36, -0.11);
+      group.add(rod);
+      const clamp = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.13), Materials.darkGunmetal);
+      clamp.position.set(0, 0.48, -0.04);
+      group.add(clamp);
+      const burette = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.52, 16), Materials.glass);
+      burette.position.set(0, 0.45, 0.03);
+      group.add(burette);
+      const liqCol = new THREE.Mesh(new THREE.CylinderGeometry(0.010, 0.010, 0.38, 14), Materials.liqClear);
+      liqCol.position.set(0, 0.42, 0.03);
+      group.add(liqCol);
+      const stopcock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.016, 0.016), Materials.anodizedBlue);
+      stopcock.position.set(0, 0.21, 0.03);
+      group.add(stopcock);
+      const flask = createErlenmeyerMesh(Materials.liqPink);
+      flask.position.set(0, 0.025, 0.03);
+      group.add(flask);
+      break;
+    }
+
+    case 'burettes': {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.025, 0.24), Materials.darkGunmetal);
+      base.position.y = 0.0125;
+      group.add(base);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.70, 12), Materials.chrome);
+      rod.position.set(0, 0.35, 0);
+      group.add(rod);
+      const holder = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.025, 0.04), Materials.anodizedBlue);
+      holder.position.set(0, 0.48, 0);
+      group.add(holder);
+      [-0.08, 0.08].forEach((offsetX, idx) => {
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.54, 16), Materials.glass);
+        b.position.set(offsetX, 0.43, 0.03);
+        group.add(b);
+        const l = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.40, 14), idx === 0 ? Materials.liqPurple : Materials.liqOrange);
+        l.position.set(offsetX, 0.40, 0.03);
+        group.add(l);
+      });
+      break;
+    }
+
+    case 'magnetic_stirrer': {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.09, 0.28), Materials.anodizedBlue);
+      body.position.y = 0.045;
+      group.add(body);
+      const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.015, 24), Materials.brushedSteel);
+      plate.position.set(0, 0.095, -0.02);
+      group.add(plate);
+      [-0.07, 0.07].forEach(kx => {
+        const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.02, 16), Materials.darkGunmetal);
+        knob.rotation.x = Math.PI / 2;
+        knob.position.set(kx, 0.045, 0.145);
+        group.add(knob);
+      });
+      const beaker = createBeakerMesh(0.07, 0.16, Materials.liqGreen);
+      beaker.position.set(0, 0.102, -0.02);
+      group.add(beaker);
+      const stirBar = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.04, 10), Materials.ivoryPlastic);
+      stirBar.rotation.z = Math.PI / 2;
+      stirBar.position.set(0, 0.115, -0.02);
+      group.add(stirBar);
+      break;
+    }
+
+    case 'volumetric_flasks': {
+      const f1 = createVolumetricFlaskMesh(Materials.liqBlue);
+      f1.position.set(-0.11, 0, 0.02);
+      group.add(f1);
+      const f2 = createVolumetricFlaskMesh(Materials.liqOrange);
+      f2.scale.set(0.85, 0.85, 0.85);
+      f2.position.set(0.11, 0, -0.03);
+      group.add(f2);
+      break;
+    }
+
+    case 'pipettes': {
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.02, 24), Materials.darkGunmetal);
+      base.position.y = 0.01;
+      group.add(base);
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.34, 14), Materials.chrome);
+      stem.position.y = 0.17;
+      group.add(stem);
+      const topDisk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.018, 24), Materials.tealEnamel);
+      topDisk.position.y = 0.32;
+      group.add(topDisk);
+      for (let i = 0; i < 4; i++) {
+        const ang = (i / 4) * Math.PI * 2;
+        const pip = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.004, 0.26, 12), i % 2 === 0 ? Materials.anodizedBlue : Materials.glass);
+        pip.position.set(Math.cos(ang) * 0.065, 0.22, Math.sin(ang) * 0.065);
+        group.add(pip);
+      }
+      break;
+    }
+
+    case 'centrifuge': {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.24, 28), Materials.ivoryPlastic);
+      body.position.y = 0.12;
+      group.add(body);
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.232, 0.236, 0.05, 28), Materials.anodizedBlue);
+      band.position.y = 0.05;
+      group.add(band);
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.22, 0.05, 28), Materials.darkGunmetal);
+      lid.position.y = 0.26;
+      group.add(lid);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.04), Materials.darkGunmetal);
+      panel.position.set(0, 0.13, 0.225);
+      panel.rotation.x = -0.25;
+      group.add(panel);
+      const disp = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.04), Materials.screenGreen);
+      disp.position.set(0, 0.135, 0.247);
+      disp.rotation.x = -0.25;
+      group.add(disp);
+      break;
+    }
+
+    case 'microscope': {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.28), Materials.darkGunmetal);
+      base.position.y = 0.0175;
+      group.add(base);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.28, 0.07), Materials.ivoryPlastic);
+      arm.position.set(0, 0.16, -0.08);
+      arm.rotation.x = 0.15;
+      group.add(arm);
+      const stage = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.015, 0.16), Materials.darkGunmetal);
+      stage.position.set(0, 0.15, 0.02);
+      group.add(stage);
+      const nosepiece = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.03, 18), Materials.chrome);
+      nosepiece.position.set(0, 0.24, 0.02);
+      group.add(nosepiece);
+      const obj = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.009, 0.05, 14), Materials.chrome);
+      obj.position.set(0, 0.205, 0.02);
+      group.add(obj);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.10), Materials.anodizedBlue);
+      head.position.set(0, 0.30, 0.0);
+      group.add(head);
+      const eyepiece = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.09, 14), Materials.darkGunmetal);
+      eyepiece.position.set(0, 0.36, 0.04);
+      eyepiece.rotation.x = 0.55;
+      group.add(eyepiece);
+      break;
+    }
+
+    case 'muffle_furnace': {
+      const cabinet = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.50, 0.46), Materials.darkGunmetal);
+      cabinet.position.y = 0.25;
+      group.add(cabinet);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.30, 0.04), Materials.brushedSteel);
+      door.position.set(0, 0.30, 0.24);
+      group.add(door);
+      const glow = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.12, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xea580c, emissiveIntensity: 0.95 })
+      );
+      glow.position.set(0, 0.31, 0.262);
+      group.add(glow);
+      const ctrl = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.10, 0.03), Materials.anodizedBlue);
+      ctrl.position.set(0, 0.08, 0.235);
+      group.add(ctrl);
+      break;
+    }
+
+    case 'drying_oven': {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.56, 0.46), Materials.warmBeigePlastic);
+      box.position.y = 0.28;
+      group.add(box);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.38, 0.03), Materials.brushedSteel);
+      door.position.set(0, 0.33, 0.235);
+      group.add(door);
+      const windowGlass = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.22), Materials.glass);
+      windowGlass.position.set(0, 0.33, 0.252);
+      group.add(windowGlass);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.03), Materials.darkGunmetal);
+      panel.position.set(0, 0.07, 0.235);
+      group.add(panel);
+      break;
+    }
+
+    case 'distiller': {
+      const boiler = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.34, 24), Materials.brushedSteel);
+      boiler.position.set(-0.07, 0.17, 0);
+      group.add(boiler);
+      const condenser = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.28, 20), Materials.chrome);
+      condenser.position.set(0.13, 0.24, 0);
+      group.add(condenser);
+      const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.20, 14), Materials.chrome);
+      bridge.rotation.z = Math.PI / 2;
+      bridge.position.set(0.03, 0.35, 0);
+      group.add(bridge);
+      const receiver = createVolumetricFlaskMesh(Materials.liqClear);
+      receiver.scale.set(0.75, 0.75, 0.75);
+      receiver.position.set(0.13, 0, 0.14);
+      group.add(receiver);
+      break;
+    }
+
+    case 'erlenmeyer_flasks': {
+      const f1 = createErlenmeyerMesh(Materials.liqBlue);
+      f1.position.set(-0.12, 0, 0.03);
+      group.add(f1);
+      const f2 = createErlenmeyerMesh(Materials.liqPink);
+      f2.scale.set(0.85, 0.85, 0.85);
+      f2.position.set(0.11, 0, -0.03);
+      group.add(f2);
+      break;
+    }
+
+    case 'beakers': {
+      const b1 = createBeakerMesh(0.085, 0.20, Materials.liqBlue);
+      b1.position.set(-0.12, 0, 0);
+      group.add(b1);
+      const b2 = createBeakerMesh(0.068, 0.16, Materials.liqGreen);
+      b2.position.set(0.06, 0, 0.05);
+      group.add(b2);
+      const b3 = createBeakerMesh(0.055, 0.13, Materials.liqOrange);
+      b3.position.set(0.16, 0, -0.05);
+      group.add(b3);
+      break;
+    }
+
+    case 'test_tubes': {
+      const rackBase = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.02, 0.10), Materials.woodOak);
+      rackBase.position.y = 0.01;
+      group.add(rackBase);
+      const rackTop = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.015, 0.10), Materials.woodOak);
+      rackTop.position.y = 0.12;
+      group.add(rackTop);
+      [-0.15, 0.15].forEach(px => {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 10), Materials.chrome);
+        post.position.set(px, 0.06, 0);
+        group.add(post);
+      });
+      const liqs = [Materials.liqBlue, Materials.liqPink, Materials.liqGreen, Materials.liqOrange, Materials.liqPurple, Materials.liqClear];
+      for (let i = 0; i < 6; i++) {
+        const tx = -0.115 + i * 0.046;
+        const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.17, 14), Materials.glass);
+        tube.position.set(tx, 0.105, 0);
+        group.add(tube);
+        const liq = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.09, 12), liqs[i]);
+        liq.position.set(tx, 0.068, 0);
+        group.add(liq);
+      }
+      break;
+    }
+
+    case 'funnels': {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.02, 0.24), Materials.darkGunmetal);
+      base.position.y = 0.01;
+      group.add(base);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.56, 12), Materials.chrome);
+      rod.position.set(0, 0.28, -0.07);
+      group.add(rod);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.006, 10, 20), Materials.chrome);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(0, 0.34, 0.02);
+      group.add(ring);
+      const sepBulb = new THREE.Mesh(new THREE.SphereGeometry(0.075, 18, 14), Materials.glass);
+      sepBulb.scale.set(0.85, 1.35, 0.85);
+      sepBulb.position.set(0, 0.36, 0.02);
+      group.add(sepBulb);
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.008, 0.12, 12), Materials.glass);
+      stem.position.set(0, 0.21, 0.02);
+      group.add(stem);
+      const beaker = createBeakerMesh(0.06, 0.13, Materials.liqPurple);
+      beaker.position.set(0, 0.02, 0.02);
+      group.add(beaker);
+      break;
+    }
+
+    case 'fume_hood': {
+      const lower = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.88, 2.4), Materials.darkGunmetal);
+      lower.position.y = -0.44;
+      group.add(lower);
+      const workTop = new THREE.Mesh(new THREE.BoxGeometry(1.14, 0.05, 2.44), Materials.graphiteTop);
+      workTop.position.y = 0.0;
+      group.add(workTop);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.45, 2.4), Materials.ivoryPlastic);
+      back.position.set(0.50, 0.72, 0);
+      group.add(back);
+      [-1.16, 1.16].forEach(sz => {
+        const side = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.45, 0.08), Materials.ivoryPlastic);
+        side.position.set(0, 0.72, sz);
+        group.add(side);
+      });
+      const hoodTop = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.45, 2.42), Materials.anodizedBlue);
+      hoodTop.position.set(0, 1.65, 0);
+      group.add(hoodTop);
+      const sash = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.85, 2.24), Materials.glass);
+      sash.position.set(-0.48, 0.98, 0);
+      group.add(sash);
+      const f1 = createErlenmeyerMesh(Materials.liqOrange);
+      f1.scale.set(1.4, 1.4, 1.4);
+      f1.position.set(0, 0.03, -0.4);
+      group.add(f1);
+      const b1 = createBeakerMesh(0.11, 0.25, Materials.liqPurple);
+      b1.position.set(0, 0.03, 0.35);
+      group.add(b1);
+      break;
+    }
+
+    case 'reagent_cabinets': {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.75, 2.05, 2.6), Materials.woodOak);
+      body.position.y = 0.12;
+      group.add(body);
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.78, 2.08, 0.08), Materials.darkGunmetal);
+      frame.position.set(0, 0.12, 0);
+      group.add(frame);
+      const glassFront = new THREE.Mesh(new THREE.BoxGeometry(0.02, 1.85, 2.4), Materials.glass);
+      glassFront.position.set(-0.38, 0.15, 0);
+      group.add(glassFront);
+      const bottleMats = [Materials.amberGlass, Materials.liqBlue, Materials.amberGlass, Materials.liqGreen, Materials.liqPurple];
+      for (let shelf = 0; shelf < 3; shelf++) {
+        const sy = -0.45 + shelf * 0.55;
+        for (let b = 0; b < 7; b++) {
+          const bz = -0.95 + b * 0.31;
+          const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.22, 14), bottleMats[(shelf + b) % bottleMats.length]);
+          bottle.position.set(-0.15, sy + 0.11, bz);
+          group.add(bottle);
+        }
+      }
+      break;
+    }
+
+    case 'reagent_fridge': {
+      const fridge = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.95, 1.05), Materials.brushedSteel);
+      fridge.position.y = 0.07;
+      group.add(fridge);
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.16, 1.08), Materials.anodizedBlue);
+      trim.position.y = 0.96;
+      group.add(trim);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.72, 0.96), Materials.chrome);
+      door.position.set(-0.43, 0.02, 0);
+      group.add(door);
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.01, 0.18), Materials.cyanGlow);
+      screen.rotation.y = -Math.PI / 2;
+      screen.position.set(-0.46, 0.96, 0);
+      group.add(screen);
+      break;
+    }
+
+    case 'safety_station': {
+      const cabinet = new THREE.Mesh(new THREE.BoxGeometry(0.65, 1.95, 1.1), Materials.ivoryPlastic);
+      cabinet.position.set(-0.6, 0.07, 0);
+      group.add(cabinet);
+      const cross = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.04), Materials.screenGreen);
+      cross.position.set(-0.6, 0.55, -0.56);
+      group.add(cross);
+      const ext = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.58, 18), Materials.safetyRed);
+      ext.position.set(0.35, -0.60, 0);
+      group.add(ext);
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.05, 14), Materials.screenGreen);
+      pipe.position.set(0.95, -0.37, 0);
+      group.add(pipe);
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.12, 0.12, 20), Materials.chrome);
+      bowl.position.set(0.95, 0.18, 0);
+      group.add(bowl);
+      break;
+    }
+  }
+
+  return group;
+}
+
+// ============================================================================
+// 5. ИНИЦИАЛИЗАЦИЯ 3D-СЦЕНЫ, ИНТЕРЬЕРА ЛАБОРАТОРИИ И КОЛЛИЗИЙ
+// ============================================================================
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xdbeafe);
+scene.fog = new THREE.FogExp2(0xe2e8f0, 0.010);
+
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 80);
+camera.position.set(0, 1.68, 7.4);
+camera.rotation.order = 'YXZ';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.04;
+container.appendChild(renderer.domElement);
+
+// Сбалансированное освещение с выраженными тенями и объёмом
+const hemiLight = new THREE.HemisphereLight(0xf8fafc, 0x334155, 0.52);
+hemiLight.position.set(0, 4.5, 0);
+scene.add(hemiLight);
+
+const sunLight = new THREE.DirectionalLight(0xfffdf7, 1.05);
+sunLight.position.set(-14, 10, 4);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.bias = -0.0005;
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 36;
+sunLight.shadow.camera.left = -15;
+sunLight.shadow.camera.right = 15;
+sunLight.shadow.camera.top = 15;
+sunLight.shadow.camera.bottom = -15;
+scene.add(sunLight);
+
+// Мягкий заполняющий свет от потолочных светильников
+[[-5.5, -4.5], [4.5, -4.5], [-5.5, 2.5], [4.5, 2.5]].forEach(([lx, lz]) => {
+  const pt = new THREE.PointLight(0xe0f2fe, 0.30, 15);
+  pt.position.set(lx, 4.1, lz);
+  scene.add(pt);
+});
+
+const obstacles = [];
+function addObstacle(minX, maxX, minZ, maxZ) {
+  obstacles.push({ minX, maxX, minZ, maxZ });
+}
+
+// Построение помещения с контрастным полом, стенами, потолком и полками
+function buildRoom() {
+  const floorTex = createFloorTexture();
+  const floorMat = new THREE.MeshStandardMaterial({
+    map: floorTex,
+    roughness: 0.28,
+    metalness: 0.12
+  });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 20), floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  // Архитектурный потолок с балками и рамками светильников
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(24, 20),
+    new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.75 })
+  );
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.y = 4.5;
+  scene.add(ceiling);
+
+  for (let bx = -8; bx <= 8; bx += 8) {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.16, 20), Materials.darkGunmetal);
+    beam.position.set(bx, 4.42, 0);
+    scene.add(beam);
+  }
+
+  const ledMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  for (let x = -6; x <= 6; x += 6) {
+    for (let z = -6; z <= 6; z += 6) {
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(2.75, 0.08, 1.25), Materials.darkGunmetal);
+      frame.position.set(x, 4.45, z);
+      scene.add(frame);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.09, 1.05), ledMat);
+      panel.position.set(x, 4.44, z);
+      scene.add(panel);
+    }
+  }
+
+  // Тёплые светло-кремовые стены + глубокий синий архитектурный пояс + тёмный плинтус
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf1efe9, roughness: 0.65 });
+  const dadoMat = new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.45 });
+  const baseboardMat = Materials.darkGunmetal;
+
+  // Северная стена (Z = -10)
+  const northWall = new THREE.Mesh(new THREE.BoxGeometry(24, 4.5, 0.3), wallMat);
+  northWall.position.set(0, 2.25, -10.15);
+  northWall.receiveShadow = true;
+  scene.add(northWall);
+
+  const northDado = new THREE.Mesh(new THREE.BoxGeometry(24, 0.95, 0.32), dadoMat);
+  northDado.position.set(0, 0.55, -10.14);
+  scene.add(northDado);
+
+  const northBase = new THREE.Mesh(new THREE.BoxGeometry(24, 0.14, 0.35), baseboardMat);
+  northBase.position.set(0, 0.07, -10.12);
+  scene.add(northBase);
+
+  // Таблица Менделеева в тёмной рамке на северной стене
+  const ptFrame = new THREE.Mesh(new THREE.BoxGeometry(4.55, 2.7, 0.06), Materials.darkGunmetal);
+  ptFrame.position.set(-5.8, 2.55, -9.98);
+  scene.add(ptFrame);
+  const ptMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.4, 2.55),
+    new THREE.MeshBasicMaterial({ map: createPeriodicTableTexture() })
+  );
+  ptMesh.position.set(-5.8, 2.55, -9.94);
+  scene.add(ptMesh);
+
+  // Настенные деревянные полки с колбами и реактивами на северной стене справа
+  [2.1, 2.8].forEach((sy, idx) => {
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.06, 0.35), Materials.woodOak);
+    shelf.position.set(6.5, sy, -9.82);
+    shelf.castShadow = true;
+    scene.add(shelf);
+    for (let i = 0; i < 5; i++) {
+      const bx = 5.2 + i * 0.65;
+      const item = idx === 0
+        ? createVolumetricFlaskMesh(i % 2 === 0 ? Materials.liqBlue : Materials.liqGreen)
+        : createBeakerMesh(0.065, 0.16, i % 2 === 0 ? Materials.liqOrange : Materials.liqPurple);
+      item.position.set(bx, sy + 0.03, -9.82);
+      scene.add(item);
+    }
+  });
+
+  // Постер правил безопасности
+  const safetyBanner = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.4, 0.85),
+    new THREE.MeshBasicMaterial({ map: createBannerTexture('ТЕХНИКА БЕЗОПАСНОСТИ', 'Халат • Защитные очки • Перчатки • Вентиляция', '#ef4444') })
+  );
+  safetyBanner.position.set(6.5, 3.65, -9.98);
+  scene.add(safetyBanner);
+
+  // Южная стена с входными дверьми (Z = 10)
+  const southWall = new THREE.Mesh(new THREE.BoxGeometry(24, 4.5, 0.3), wallMat);
+  southWall.position.set(0, 2.25, 10.15);
+  scene.add(southWall);
+
+  const southDado = new THREE.Mesh(new THREE.BoxGeometry(24, 0.95, 0.32), dadoMat);
+  southDado.position.set(0, 0.55, 10.14);
+  scene.add(southDado);
+
+  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.6, 0.34), Materials.darkGunmetal);
+  doorFrame.position.set(0, 1.3, 10.12);
+  scene.add(doorFrame);
+  const doorGlass = new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.4, 0.36), Materials.glass);
+  doorGlass.position.set(0, 1.25, 10.12);
+  scene.add(doorGlass);
+
+  // Восточная стена (X = 12)
+  const eastWall = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4.5, 20), wallMat);
+  eastWall.position.set(12.15, 2.25, 0);
+  eastWall.receiveShadow = true;
+  scene.add(eastWall);
+
+  // Западная стена с панорамными окнами в тёмных рамах (X = -12)
+  const westLower = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.05, 20), dadoMat);
+  westLower.position.set(-12.15, 0.525, 0);
+  scene.add(westLower);
+  const westUpper = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.8, 20), wallMat);
+  westUpper.position.set(-12.15, 4.1, 0);
+  scene.add(westUpper);
+
+  [-9.5, -3.2, 3.2, 9.5].forEach(wz => {
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.34, 4.5, 1.0), wallMat);
+    pillar.position.set(-12.15, 2.25, wz);
+    scene.add(pillar);
+  });
+
+  const winGlass = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.7, 18.5), Materials.glass);
+  winGlass.position.set(-12.05, 2.38, 0);
+  scene.add(winGlass);
+
+  const skyOutside = new THREE.Mesh(
+    new THREE.PlaneGeometry(36, 16),
+    new THREE.MeshBasicMaterial({ color: 0xbae6fd })
+  );
+  skyOutside.rotation.y = Math.PI / 2;
+  skyOutside.position.set(-18, 4, 0);
+  scene.add(skyOutside);
+
+  const lawnOutside = new THREE.Mesh(
+    new THREE.PlaneGeometry(36, 14),
+    new THREE.MeshBasicMaterial({ color: 0x4ade80 })
+  );
+  lawnOutside.rotation.x = -Math.PI / 2;
+  lawnOutside.position.set(-16, -0.2, 0);
+  scene.add(lawnOutside);
+}
+
+// Построение детализированных лабораторных столов с графитовой столешницей,
+// стальным каркасом, деревянными тумбами, мойкой и надстройкой
+function createLabTable(x, z, width, depth, zoneObj) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+
+  // Тёмно-графитовая химстойкая столешница
+  const top = new THREE.Mesh(
+    new THREE.BoxGeometry(width, 0.06, depth),
+    Materials.graphiteTop
+  );
+  top.position.y = 0.85;
+  top.castShadow = true;
+  top.receiveShadow = true;
+  group.add(top);
+
+  // Цветной защитный кант по периметру столешницы
+  const trim = new THREE.Mesh(
+    new THREE.BoxGeometry(width + 0.03, 0.035, depth + 0.03),
+    new THREE.MeshStandardMaterial({ color: zoneObj.color, roughness: 0.35, metalness: 0.3 })
+  );
+  trim.position.y = 0.84;
+  group.add(trim);
+
+  // Деревянные тумбы с металлическими ручками
+  [-width / 2 + 0.55, width / 2 - 0.55].forEach(cx => {
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.76, depth - 0.18), Materials.woodOak);
+    cab.position.set(cx, 0.42, 0);
+    cab.castShadow = true;
+    cab.receiveShadow = true;
+    group.add(cab);
+
+    // Ручки ящиков из хромированной стали
+    [0.58, 0.28].forEach(hy => {
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.018, 0.03), Materials.chrome);
+      handle.position.set(cx, hy, depth / 2 - 0.08);
+      group.add(handle);
+    });
+  });
+
+  // Стальные трубчатые ножки по углам и центру
+  const legPositions = [
+    [-width / 2 + 0.08, -depth / 2 + 0.08],
+    [width / 2 - 0.08, -depth / 2 + 0.08],
+    [-width / 2 + 0.08, depth / 2 - 0.08],
+    [width / 2 - 0.08, depth / 2 - 0.08],
+    [0, -depth / 2 + 0.08],
+    [0, depth / 2 - 0.08]
+  ];
+  legPositions.forEach(([lx, lz]) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.82, 0.06), Materials.brushedSteel);
+    leg.position.set(lx, 0.41, lz);
+    leg.castShadow = true;
+    group.add(leg);
+  });
+
+  // Встроенная лабораторная мойка из нержавеющей стали на правом краю стола
+  const sinkX = width / 2 - 0.26;
+  const sinkBasin = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.04, 0.44), Materials.chrome);
+  sinkBasin.position.set(sinkX, 0.87, 0);
+  group.add(sinkBasin);
+  const sinkInner = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.045, 0.38), Materials.darkGunmetal);
+  sinkInner.position.set(sinkX, 0.872, 0);
+  group.add(sinkInner);
+  const faucetPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.26, 12), Materials.chrome);
+  faucetPipe.position.set(sinkX + 0.12, 1.0, -0.14);
+  group.add(faucetPipe);
+  const faucetSpout = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.14, 12), Materials.chrome);
+  faucetSpout.rotation.z = Math.PI / 2.5;
+  faucetSpout.position.set(sinkX + 0.06, 1.12, -0.14);
+  group.add(faucetSpout);
+
+  // Информационная табличка зоны над столом
+  const bannerTex = createBannerTexture(zoneObj.name, zoneObj.shortName, zoneObj.color);
+  const banner = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.3, 0.62),
+    new THREE.MeshBasicMaterial({ map: bannerTex, side: THREE.DoubleSide, transparent: true })
+  );
+  banner.position.set(0, 2.38, 0);
+  group.add(banner);
+
+  [-0.9, 0.9].forEach(sx => {
+    const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1.85, 8), Materials.darkGunmetal);
+    wire.position.set(sx, 3.55, 0);
+    group.add(wire);
+  });
+
+  scene.add(group);
+  addObstacle(x - width / 2 - 0.25, x + width / 2 + 0.25, z - depth / 2 - 0.25, z + depth / 2 + 0.25);
+}
+
+buildRoom();
+
+// 4 островных лабораторных стола
+createLabTable(-5.5, -4.5, 4.6, 1.48, ZONES_DATA[0]); // Аналитика
+createLabTable(-5.5, 1.5, 4.6, 1.48, ZONES_DATA[1]);  // Титрование
+createLabTable(0.0, -6.8, 6.3, 1.48, ZONES_DATA[2]);  // Физ-хим исследования
+createLabTable(4.2, -1.5, 4.5, 1.48, ZONES_DATA[3]);  // Растворы
+
+// Коллизии для пристенных станций (Зона 5 и Зона 6)
+addObstacle(9.6, 11.8, -6.7, 3.2);
+addObstacle(6.2, 9.0, 5.9, 7.7);
+
+// Таблички над пристенными зонами
+[
+  { zone: ZONES_DATA[4], x: 9.8, y: 2.75, z: -1.5, rotY: -Math.PI / 2 },
+  { zone: ZONES_DATA[5], x: 7.5, y: 2.65, z: 6.8, rotY: Math.PI }
+].forEach(item => {
+  const b = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.5, 0.68),
+    new THREE.MeshBasicMaterial({ map: createBannerTexture(item.zone.name, item.zone.shortName, item.zone.color), side: THREE.DoubleSide, transparent: true })
+  );
+  b.position.set(item.x, item.y, item.z);
+  b.rotation.y = item.rotY;
+  scene.add(b);
+});
+
+// Размещаем все 21 интерактивный прибор в 3D-сцене
+const interactiveMeshes = [];
+const equipmentMap = {};
+
+EQUIPMENT_DATA.forEach(eq => {
+  const model = buildEquipmentModel(eq.id);
+  model.position.set(eq.pos.x, eq.pos.y, eq.pos.z);
+
+  model.traverse(child => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+      child.userData.interactiveId = eq.id;
+    }
+  });
+  model.userData.interactiveId = eq.id;
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.16, 0.19, 28),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.65 })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(eq.pos.x, eq.pos.y + 0.004, eq.pos.z);
+  scene.add(ring);
+
+  scene.add(model);
+  interactiveMeshes.push(model);
+  equipmentMap[eq.id] = { data: eq, mesh: model, ring, state: {} };
+});
+
+// ============================================================================
+// 6. ЧЕЛОВЕКОПОДОБНЫЙ РОБОТ-ИНСТРУКТОР «АТОМ»
+// ============================================================================
+const RobotInstructor = {
+  group: new THREE.Group(),
+  head: null,
+  leftArm: null,
+  rightArm: null,
+  leftLeg: null,
+  rightLeg: null,
+  atomRing: null,
+
+  pos: new THREE.Vector3(0.0, 0, 4.2),
+  targetPos: new THREE.Vector3(0.0, 0, 5.2),
+  mode: 'GREET',
+  patrolIndex: 0,
+  waitTimer: 0,
+  waveTimer: 2.5,
+  bubbleTimeout: null,
+
+  waypoints: [
+    new THREE.Vector3(-2.8, 0, -3.0),
+    new THREE.Vector3(-2.8, 0, 2.2),
+    new THREE.Vector3(0.5, 0, -4.5),
+    new THREE.Vector3(2.2, 0, -0.5),
+    new THREE.Vector3(7.6, 0, -2.5),
+    new THREE.Vector3(5.0, 0, 4.8)
+  ],
+
+  init() {
+    const armorMat = Materials.ivoryPlastic;
+    const jointMat = Materials.anodizedBlue;
+    const visorMat = Materials.darkGunmetal;
+    const eyeMat = Materials.cyanGlow;
+
+    this.leftLeg = new THREE.Group();
+    this.leftLeg.position.set(-0.14, 0.78, 0);
+    const lThigh = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.06, 0.68, 16), armorMat);
+    lThigh.position.y = -0.34;
+    const lFoot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.24), jointMat);
+    lFoot.position.set(0, -0.72, 0.04);
+    this.leftLeg.add(lThigh, lFoot);
+
+    this.rightLeg = new THREE.Group();
+    this.rightLeg.position.set(0.14, 0.78, 0);
+    const rThigh = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.06, 0.68, 16), armorMat);
+    rThigh.position.y = -0.34;
+    const rFoot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.24), jointMat);
+    rFoot.position.set(0, -0.72, 0.04);
+    this.rightLeg.add(rThigh, rFoot);
+
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.17, 0.56, 20), armorMat);
+    torso.position.y = 1.08;
+    const chestCore = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), eyeMat);
+    chestCore.position.set(0, 1.14, 0.20);
+    this.atomRing = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.01, 8, 24), jointMat);
+    this.atomRing.position.set(0, 1.14, 0.20);
+
+    this.head = new THREE.Group();
+    this.head.position.y = 1.54;
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.18, 22, 18), armorMat);
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.11, 0.10), visorMat);
+    visor.position.set(0, 0.01, 0.13);
+    const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 12), eyeMat);
+    leftEye.position.set(-0.055, 0.015, 0.182);
+    const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 12), eyeMat);
+    rightEye.position.set(0.055, 0.015, 0.182);
+    const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 8), jointMat);
+    antenna.position.set(0, 0.21, 0);
+    const antTip = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 12), eyeMat);
+    antTip.position.set(0, 0.27, 0);
+    this.head.add(skull, visor, leftEye, rightEye, antenna, antTip);
+
+    this.leftArm = new THREE.Group();
+    this.leftArm.position.set(-0.30, 1.30, 0);
+    const lArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.52, 14), armorMat);
+    lArmMesh.position.y = -0.24;
+    const lHand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), jointMat);
+    lHand.position.y = -0.52;
+    this.leftArm.add(lArmMesh, lHand);
+
+    this.rightArm = new THREE.Group();
+    this.rightArm.position.set(0.30, 1.30, 0);
+    const rArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.52, 14), armorMat);
+    rArmMesh.position.y = -0.24;
+    const rHand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), jointMat);
+    rHand.position.y = -0.52;
+    this.rightArm.add(rArmMesh, rHand);
+
+    this.group.add(this.leftLeg, this.rightLeg, torso, chestCore, this.atomRing, this.head, this.leftArm, this.rightArm);
+    this.group.position.copy(this.pos);
+
+    this.group.traverse(c => {
+      if (c.isMesh) {
+        c.castShadow = true;
+        c.userData.interactiveId = 'robot_instructor';
+      }
+    });
+    this.group.userData.interactiveId = 'robot_instructor';
+    scene.add(this.group);
+    interactiveMeshes.push(this.group);
+  },
+
+  sayBubble(text, duration = 5500) {
+    const bubble = document.getElementById('robot-bubble');
+    bubble.textContent = text;
+    bubble.style.display = 'block';
+    clearTimeout(this.bubbleTimeout);
+    this.bubbleTimeout = setTimeout(() => {
+      bubble.style.display = 'none';
+    }, duration);
+  },
+
+  goToZone(zone) {
+    this.mode = 'TOUR';
+    this.targetPos.set(zone.robotPos.x, 0, zone.robotPos.z);
+    this.waveTimer = 2.0;
+    this.sayBubble(`Следуйте за мной в: ${zone.name}!`, 5000);
+  },
+
+  update(dt, time, playerPos) {
+    this.atomRing.rotation.z = time * 2.5;
+    this.atomRing.rotation.x = Math.sin(time * 1.5) * 0.5;
+
+    if (this.mode === 'GREET') {
+      const toPlayer = new THREE.Vector3().subVectors(playerPos, this.pos);
+      toPlayer.y = 0;
+      if (toPlayer.length() > 2.3) {
+        this.targetPos.copy(playerPos).addScaledVector(toPlayer.normalize(), -2.0);
+      } else {
+        this.mode = 'PATROL';
+        this.waitTimer = 3.5;
+        this.waveTimer = 3.0;
+        this.sayBubble('Привет! Я Атом, ваш инструктор. Нажмите E рядом со мной или на прибор!', 6500);
+      }
+    } else if (this.mode === 'FOLLOW') {
+      const toPlayer = new THREE.Vector3().subVectors(playerPos, this.pos);
+      toPlayer.y = 0;
+      if (toPlayer.length() > 2.4) {
+        this.targetPos.copy(playerPos).addScaledVector(toPlayer.normalize(), -2.1);
+      }
+    } else if (this.mode === 'PATROL') {
+      if (this.waitTimer > 0) {
+        this.waitTimer -= dt;
+      } else {
+        this.targetPos.copy(this.waypoints[this.patrolIndex]);
+      }
+    }
+
+    const diff = new THREE.Vector3().subVectors(this.targetPos, this.pos);
+    diff.y = 0;
+    const dist = diff.length();
+
+    if (dist > 0.18) {
+      const dir = diff.normalize();
+      const speed = 1.95;
+      const nextX = this.pos.x + dir.x * speed * dt;
+      const nextZ = this.pos.z + dir.z * speed * dt;
+
+      if (!checkCollision(nextX, nextZ, 0.35)) {
+        this.pos.x = nextX;
+        this.pos.z = nextZ;
+      } else if (!checkCollision(nextX, this.pos.z, 0.35)) {
+        this.pos.x = nextX;
+      } else if (!checkCollision(this.pos.x, nextZ, 0.35)) {
+        this.pos.z = nextZ;
+      } else if (this.mode === 'PATROL') {
+        this.patrolIndex = (this.patrolIndex + 1) % this.waypoints.length;
+      }
+
+      this.group.rotation.y = Math.atan2(dir.x, dir.z);
+
+      const swing = Math.sin(time * 8) * 0.45;
+      this.leftLeg.rotation.x = swing;
+      this.rightLeg.rotation.x = -swing;
+      this.leftArm.rotation.x = -swing * 0.7;
+      if (this.waveTimer <= 0) this.rightArm.rotation.x = swing * 0.7;
+    } else {
+      this.leftLeg.rotation.x *= 0.85;
+      this.rightLeg.rotation.x *= 0.85;
+      this.leftArm.rotation.x *= 0.85;
+      this.group.rotation.y = Math.atan2(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
+
+      if (this.mode === 'PATROL' && this.waitTimer <= 0) {
+        this.waitTimer = 4.0 + Math.random() * 2.5;
+        this.patrolIndex = (this.patrolIndex + 1) % this.waypoints.length;
+        const comments = [
+          'Проверяю калибровку оборудования...',
+          'В лаборатории важно соблюдать чистоту посуды.',
+          'Подойдите к любому прибору, чтобы изучить его устройство!',
+          'Готов провести экскурсию по зонам лаборатории.'
+        ];
+        if (Math.random() < 0.55) {
+          this.sayBubble(comments[Math.floor(Math.random() * comments.length)], 4500);
+        }
+      }
+    }
+
+    if (this.waveTimer > 0) {
+      this.waveTimer -= dt;
+      this.rightArm.rotation.z = -2.4 + Math.sin(time * 12) * 0.35;
+      this.rightArm.rotation.x = 0;
+    } else {
+      this.rightArm.rotation.z *= 0.85;
+    }
+
+    this.group.position.copy(this.pos);
+
+    const bubble = document.getElementById('robot-bubble');
+    if (bubble.style.display === 'block') {
+      const headWorld = new THREE.Vector3(this.pos.x, 2.02, this.pos.z);
+      headWorld.project(camera);
+      if (headWorld.z < 1) {
+        const bx = (headWorld.x * 0.5 + 0.5) * window.innerWidth;
+        const by = (-headWorld.y * 0.5 + 0.5) * window.innerHeight;
+        bubble.style.left = `${bx}px`;
+        bubble.style.top = `${by}px`;
+      }
+    }
+  }
+};
+
+RobotInstructor.init();
+
+// ============================================================================
+// 7. 3D-ПРЕДПРОСМОТР ПРИБОРА ВНУТРИ ОКНА ИЗУЧЕНИЯ
+// ============================================================================
+const Preview3D = {
+  renderer: null,
+  scene: null,
+  camera: null,
+  currentModel: null,
+  isDragging: false,
+  prevX: 0,
+  prevY: 0,
+
+  init() {
+    const box = document.getElementById('preview-3d-box');
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(42, box.clientWidth / box.clientHeight, 0.1, 20);
+    this.camera.position.set(0, 0.45, 1.15);
+    this.camera.lookAt(0, 0.2, 0);
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer.setSize(box.clientWidth || 300, box.clientHeight || 250);
+    this.renderer.outputEncoding = THREE.sRGBEncoding;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    box.insertBefore(this.renderer.domElement, box.firstChild);
+
+    const hLight = new THREE.HemisphereLight(0xffffff, 0x334155, 0.9);
+    this.scene.add(hLight);
+    const dLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dLight.position.set(2, 4, 3);
+    this.scene.add(dLight);
+
+    const ped = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42, 0.46, 0.04, 32),
+      Materials.graphiteTop
+    );
+    ped.position.y = -0.02;
+    this.scene.add(ped);
+
+    const startDrag = (x, y) => { this.isDragging = true; this.prevX = x; this.prevY = y; };
+    const moveDrag = (x, y) => {
+      if (!this.isDragging || !this.currentModel) return;
+      this.currentModel.rotation.y += (x - this.prevX) * 0.015;
+      this.currentModel.rotation.x = Math.max(-0.5, Math.min(0.5, this.currentModel.rotation.x + (y - this.prevY) * 0.01));
+      this.prevX = x;
+      this.prevY = y;
+    };
+    const endDrag = () => { this.isDragging = false; };
+
+    box.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
+    window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+    window.addEventListener('mouseup', endDrag);
+
+    box.addEventListener('touchstart', e => {
+      if (e.touches[0]) startDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    box.addEventListener('touchmove', e => {
+      if (e.touches[0]) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    box.addEventListener('touchend', endDrag);
+  },
+
+  showEquipment(id) {
+    if (!this.renderer) this.init();
+    const box = document.getElementById('preview-3d-box');
+    if (box.clientWidth > 0) {
+      this.renderer.setSize(box.clientWidth, box.clientHeight);
+      this.camera.aspect = box.clientWidth / box.clientHeight;
+      this.camera.updateProjectionMatrix();
+    }
+
+    if (this.currentModel) {
+      this.scene.remove(this.currentModel);
+    }
+
+    const model = buildEquipmentModel(id);
+    const bbox = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    bbox.getSize(size);
+    bbox.getCenter(center);
+
+    const maxDim = Math.max(size.x, size.y, size.z, 0.25);
+    const scale = 0.58 / maxDim;
+    model.scale.setScalar(scale);
+    model.position.set(-center.x * scale, -bbox.min.y * scale, -center.z * scale);
+
+    const wrapper = new THREE.Group();
+    wrapper.add(model);
+    this.currentModel = wrapper;
+    this.scene.add(wrapper);
+  },
+
+  render() {
+    if (!this.renderer || !document.getElementById('equipment-modal').classList.contains('open')) return;
+    if (this.currentModel && !this.isDragging) {
+      this.currentModel.rotation.y += 0.008;
+    }
+    this.renderer.render(this.scene, this.camera);
+  }
+};
+
+// ============================================================================
+// 8. УПРАВЛЕНИЕ ОТ ПЕРВОГО ЛИЦА (WASD + МЫШЬ + СЕНСОРНЫЙ ДЖОЙСТИК)
+// ============================================================================
+const keys = {};
+const joyInput = { x: 0, z: 0 };
+let isModalOpen = false;
+let isMouseDragging = false;
+let lastMouseX = 0, lastMouseY = 0;
+
+function checkCollision(x, z, radius = 0.42) {
+  if (x < -11.3 + radius || x > 11.3 - radius || z < -9.3 + radius || z > 9.3 - radius) return true;
+  for (let i = 0; i < obstacles.length; i++) {
+    const o = obstacles[i];
+    if (x + radius > o.minX && x - radius < o.maxX && z + radius > o.minZ && z - radius < o.maxZ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'KeyE' && !isModalOpen) {
+    triggerCurrentTarget();
+  }
+  if (e.code === 'KeyM') {
+    toggleMapModal();
+  }
+  if (e.code === 'Escape') {
+    closeAllModals();
+  }
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+renderer.domElement.addEventListener('click', () => {
+  if (isModalOpen) return;
+  if (renderer.domElement.requestPointerLock) {
+    renderer.domElement.requestPointerLock();
+  }
+});
+
+document.addEventListener('mousemove', e => {
+  if (isModalOpen) return;
+  if (document.pointerLockElement === renderer.domElement) {
+    camera.rotation.y -= e.movementX * 0.0022;
+    camera.rotation.x = Math.max(-1.3, Math.min(1.3, camera.rotation.x - e.movementY * 0.0022));
+  } else if (isMouseDragging) {
+    camera.rotation.y -= (e.clientX - lastMouseX) * 0.004;
+    camera.rotation.x = Math.max(-1.3, Math.min(1.3, camera.rotation.x - (e.clientY - lastMouseY) * 0.004));
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  }
+});
+
+renderer.domElement.addEventListener('mousedown', e => {
+  if (isModalOpen) return;
+  isMouseDragging = true;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+window.addEventListener('mouseup', () => { isMouseDragging = false; });
+
+function setupMobileControls() {
+  const joyZone = document.getElementById('joystick-zone');
+  const joyKnob = document.getElementById('joystick-knob');
+  const lookZone = document.getElementById('touch-look-zone');
+  let joyActive = false;
+  let lookTouchId = null;
+  let prevLookX = 0, prevLookY = 0;
+
+  const updateJoy = (clientX, clientY) => {
+    const rect = joyZone.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const maxR = rect.width / 2 - 15;
+    let dx = clientX - cx;
+    let dy = clientY - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > maxR) {
+      dx = (dx / dist) * maxR;
+      dy = (dy / dist) * maxR;
+    }
+    joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    joyInput.x = dx / maxR;
+    joyInput.z = dy / maxR;
+  };
+
+  joyZone.addEventListener('touchstart', e => {
+    joyActive = true;
+    updateJoy(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+
+  joyZone.addEventListener('touchmove', e => {
+    if (joyActive) updateJoy(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+
+  const resetJoy = () => {
+    joyActive = false;
+    joyKnob.style.transform = 'translate(-50%, -50%)';
+    joyInput.x = 0;
+    joyInput.z = 0;
+  };
+  joyZone.addEventListener('touchend', resetJoy);
+  joyZone.addEventListener('touchcancel', resetJoy);
+
+  lookZone.addEventListener('touchstart', e => {
+    const t = e.changedTouches[0];
+    lookTouchId = t.identifier;
+    prevLookX = t.clientX;
+    prevLookY = t.clientY;
+  }, { passive: true });
+
+  lookZone.addEventListener('touchmove', e => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      if (t.identifier === lookTouchId) {
+        camera.rotation.y -= (t.clientX - prevLookX) * 0.005;
+        camera.rotation.x = Math.max(-1.3, Math.min(1.3, camera.rotation.x - (t.clientY - prevLookY) * 0.005));
+        prevLookX = t.clientX;
+        prevLookY = t.clientY;
+      }
+    }
+  }, { passive: true });
+}
+setupMobileControls();
+
+// ============================================================================
+// 9. ИНТЕРАКТИВНОСТЬ, RAYCASTING, МОДАЛЬНЫЕ ОКНА И ДИАЛОГИ ИНСТРУКТОРА
+// ============================================================================
+const raycaster = new THREE.Raycaster();
+let currentTargetId = null;
+let currentOpenedEqId = null;
+
+function updateTargetDetection() {
+  if (isModalOpen) return;
+
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const hits = raycaster.intersectObjects(interactiveMeshes, true);
+  let foundId = null;
+
+  if (hits.length > 0 && hits[0].distance < 3.6) {
+    let obj = hits[0].object;
+    while (obj && !obj.userData.interactiveId) {
+      obj = obj.parent;
+    }
+    if (obj) foundId = obj.userData.interactiveId;
+  }
+
+  if (!foundId) {
+    let minDist = 2.1;
+    const robotDist = Math.hypot(camera.position.x - RobotInstructor.pos.x, camera.position.z - RobotInstructor.pos.z);
+    if (robotDist < 2.2) {
+      foundId = 'robot_instructor';
+      minDist = robotDist;
+    }
+    EQUIPMENT_DATA.forEach(eq => {
+      const d = Math.hypot(camera.position.x - eq.pos.x, camera.position.z - eq.pos.z);
+      if (d < minDist) {
+        minDist = d;
+        foundId = eq.id;
+      }
+    });
+  }
+
+  currentTargetId = foundId;
+  const promptEl = document.getElementById('interact-prompt');
+  const crosshair = document.getElementById('crosshair');
+  const mobInspect = document.getElementById('mob-btn-inspect');
+
+  if (foundId) {
+    crosshair.classList.add('active');
+    promptEl.classList.add('visible');
+    mobInspect.style.display = 'block';
+
+    if (foundId === 'robot_instructor') {
+      document.getElementById('prompt-cat').textContent = 'ИИ-Наставник';
+      document.getElementById('prompt-name').textContent = 'Робот-инструктор «Атом»';
+      document.getElementById('btn-inspect-now').textContent = 'Поговорить [E]';
+    } else {
+      const eq = equipmentMap[foundId].data;
+      const zone = ZONES_DATA.find(z => z.id === eq.zoneId);
+      document.getElementById('prompt-cat').textContent = zone ? zone.shortName : 'Оборудование';
+      document.getElementById('prompt-name').textContent = eq.name;
+      document.getElementById('btn-inspect-now').textContent = 'Изучить [E]';
+    }
+  } else {
+    crosshair.classList.remove('active');
+    promptEl.classList.remove('visible');
+    mobInspect.style.display = 'none';
+  }
+}
+
+function triggerCurrentTarget() {
+  if (!currentTargetId) return;
+  if (currentTargetId === 'robot_instructor') {
+    openInstructorDialog();
+  } else {
+    openEquipmentModal(currentTargetId);
+  }
+}
+
+function openEquipmentModal(id) {
+  const entry = equipmentMap[id];
+  if (!entry) return;
+  SoundFX.click();
+
+  if (document.pointerLockElement) document.exitPointerLock();
+  isModalOpen = true;
+  currentOpenedEqId = id;
+
+  const eq = entry.data;
+  const zone = ZONES_DATA.find(z => z.id === eq.zoneId);
+
+  document.getElementById('modal-eq-zone').textContent = zone ? zone.name : 'Лаборатория';
+  document.getElementById('modal-eq-title').textContent = eq.name;
+  document.getElementById('modal-eq-purpose').textContent = eq.purpose;
+  document.getElementById('modal-eq-principle').textContent = eq.principle;
+  document.getElementById('modal-eq-examples').textContent = eq.examples;
+
+  const partsList = document.getElementById('modal-eq-parts');
+  partsList.innerHTML = '';
+  eq.parts.forEach(p => {
+    const li = document.createElement('li');
+    li.textContent = p;
+    partsList.appendChild(li);
+  });
+
+  document.getElementById('exp-status-text').textContent = 'Прибор готов к демонстрации. Нажмите кнопку ниже!';
+  document.getElementById('btn-run-experiment').textContent = eq.expBtn;
+
+  document.getElementById('equipment-modal').classList.add('open');
+  Preview3D.showEquipment(id);
+}
+
+document.getElementById('btn-run-experiment').addEventListener('click', () => {
+  if (!currentOpenedEqId) return;
+  const entry = equipmentMap[currentOpenedEqId];
+  const resultText = entry.data.expAction(entry.state);
+  document.getElementById('exp-status-text').textContent = resultText;
+  entry.ring.material.color.setHex(entry.state.active || entry.state.step ? 0x10b981 : 0x38bdf8);
+});
+
+function openInstructorDialog() {
+  SoundFX.robotGreet();
+  if (document.pointerLockElement) document.exitPointerLock();
+  isModalOpen = true;
+  RobotInstructor.waveTimer = 2.0;
+  document.getElementById('instructor-dialog').style.display = 'block';
+}
+
+function closeAllModals() {
+  isModalOpen = false;
+  currentOpenedEqId = null;
+  document.getElementById('equipment-modal').classList.remove('open');
+  document.getElementById('map-modal').classList.remove('open');
+  document.getElementById('instructor-dialog').style.display = 'none';
+}
+
+let factIndex = 0;
+document.getElementById('dialog-actions').addEventListener('click', e => {
+  const btn = e.target.closest('.dialog-chip');
+  if (!btn) return;
+  SoundFX.click();
+
+  const action = btn.dataset.action;
+  const dialogText = document.getElementById('dialog-text');
+  const actionsWrap = document.getElementById('dialog-actions');
+
+  if (action === 'tour-menu') {
+    dialogText.textContent = 'Выберите зону лаборатории — я подойду к ней и расскажу, какие исследования там проводятся:';
+    actionsWrap.innerHTML = ZONES_DATA.map(z =>
+      `<button class="dialog-chip" data-action="goto-zone" data-zone="${z.id}">${z.shortName}</button>`
+    ).join('') + `<button class="dialog-chip" data-action="main-menu">⬅ Назад</button>`;
+  } else if (action === 'goto-zone') {
+    const z = ZONES_DATA.find(item => item.id === btn.dataset.zone);
+    if (z) {
+      RobotInstructor.goToZone(z);
+      dialogText.innerHTML = `<b>${z.name}:</b> ${z.desc}. Я уже направляюсь к этой зоне — следуйте за мной или откройте карту, чтобы телепортироваться!`;
+    }
+  } else if (action === 'nearest') {
+    let closest = EQUIPMENT_DATA[0];
+    let minD = Infinity;
+    EQUIPMENT_DATA.forEach(eq => {
+      const d = Math.hypot(camera.position.x - eq.pos.x, camera.position.z - eq.pos.z);
+      if (d < minD) { minD = d; closest = eq; }
+    });
+    RobotInstructor.targetPos.set(closest.pos.x, 0, closest.pos.z + 1.4);
+    RobotInstructor.mode = 'TOUR';
+    dialogText.innerHTML = `Ближайший к вам прибор — <b>${closest.name}</b>. ${closest.purpose} Нажмите «Изучить», чтобы запустить демонстрационный опыт!`;
+  } else if (action === 'fact') {
+    dialogText.textContent = '💡 ' + ROBOT_FACTS[factIndex];
+    factIndex = (factIndex + 1) % ROBOT_FACTS.length;
+  } else if (action === 'follow') {
+    if (RobotInstructor.mode === 'FOLLOW') {
+      RobotInstructor.mode = 'PATROL';
+      btn.textContent = '🚶 Следуй за мной';
+      dialogText.textContent = 'Хорошо, я продолжу плановый обход лаборатории. Позовите меня в любой момент!';
+    } else {
+      RobotInstructor.mode = 'FOLLOW';
+      btn.textContent = '🛑 Отпустить инструктора';
+      dialogText.textContent = 'С удовольствием! Я буду сопровождать вас по лаборатории и помогать с приборами.';
+    }
+  } else if (action === 'main-menu') {
+    dialogText.textContent = 'Чем я могу помочь вам в лаборатории?';
+    actionsWrap.innerHTML = `
+      <button class="dialog-chip" data-action="tour-menu">🧭 Экскурсия по зонам</button>
+      <button class="dialog-chip" data-action="nearest">🔬 Расскажи о ближайшем приборе</button>
+      <button class="dialog-chip" data-action="fact">💡 Интересный научный факт</button>
+      <button class="dialog-chip" data-action="follow">🚶 Следуй за мной</button>
+    `;
+  }
+});
+
+// ============================================================================
+// 10. ИНТЕРАКТИВНАЯ КАРТА ЛАБОРАТОРИИ И МИНИ-РАДАР
+// ============================================================================
+function drawLabBlueprint(ctx, w, h, interactive = false) {
+  ctx.clearRect(0, 0, w, h);
+  const toX = wx => ((wx + 12) / 24) * w;
+  const toY = wz => ((wz + 10) / 20) * h;
+
+  ctx.fillStyle = '#334155';
+  ctx.fillRect(0, 0, w, h);
+
+  ZONES_DATA.forEach(z => {
+    const x1 = toX(z.bounds.minX);
+    const y1 = toY(z.bounds.minZ);
+    const zw = toX(z.bounds.maxX) - x1;
+    const zh = toY(z.bounds.maxZ) - y1;
+    ctx.fillStyle = z.color + '33';
+    ctx.fillRect(x1, y1, zw, zh);
+    if (interactive) {
+      ctx.strokeStyle = z.color;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x1, y1, zw, zh);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 12px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(z.shortName, x1 + zw / 2, y1 + 16);
+    }
+  });
+
+  ctx.fillStyle = '#0f172a';
+  obstacles.forEach(o => {
+    const ox = toX(o.minX);
+    const oy = toY(o.minZ);
+    ctx.fillRect(ox, oy, toX(o.maxX) - ox, toY(o.maxZ) - oy);
+  });
+
+  EQUIPMENT_DATA.forEach(eq => {
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.arc(toX(eq.pos.x), toY(eq.pos.z), interactive ? 4 : 2.3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  const rx = toX(RobotInstructor.pos.x);
+  const ry = toY(RobotInstructor.pos.z);
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath();
+  ctx.arc(rx, ry, interactive ? 7 : 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  if (interactive) {
+    ctx.fillStyle = '#fef3c7';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('Атом', rx, ry - 10);
+  }
+
+  const px = toX(camera.position.x);
+  const py = toY(camera.position.z);
+  const yaw = -camera.rotation.y - Math.PI / 2;
+
+  ctx.fillStyle = 'rgba(16, 185, 129, 0.32)';
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.arc(px, py, interactive ? 34 : 20, yaw - 0.5, yaw + 0.5);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#10b981';
+  ctx.beginPath();
+  ctx.arc(px, py, interactive ? 7 : 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+function toggleMapModal() {
+  const modal = document.getElementById('map-modal');
+  if (modal.classList.contains('open')) {
+    closeAllModals();
+    return;
+  }
+  SoundFX.click();
+  if (document.pointerLockElement) document.exitPointerLock();
+  isModalOpen = true;
+  modal.classList.add('open');
+
+  const list = document.getElementById('map-zone-list');
+  list.innerHTML = ZONES_DATA.map(z => `
+    <button class="zone-teleport-btn" data-zone-id="${z.id}" style="border-left: 5px solid ${z.color};">
+      <strong>${z.name}</strong>
+      <span>${z.desc}</span>
+    </button>
+  `).join('');
+
+  const fCanvas = document.getElementById('fullmap-canvas');
+  drawLabBlueprint(fCanvas.getContext('2d'), fCanvas.width, fCanvas.height, true);
+}
+
+function teleportToZone(zoneId) {
+  const z = ZONES_DATA.find(item => item.id === zoneId);
+  if (!z) return;
+  SoundFX.click();
+  camera.position.set(z.teleport.x, 1.68, z.teleport.z);
+  camera.rotation.y = z.teleport.rotY;
+  camera.rotation.x = 0;
+  closeAllModals();
+}
+
+document.getElementById('map-zone-list').addEventListener('click', e => {
+  const btn = e.target.closest('.zone-teleport-btn');
+  if (btn) teleportToZone(btn.dataset.zoneId);
+});
+
+document.getElementById('fullmap-canvas').addEventListener('click', e => {
+  const rect = e.target.getBoundingClientRect();
+  const wx = ((e.clientX - rect.left) / rect.width) * 24 - 12;
+  const wz = ((e.clientY - rect.top) / rect.height) * 20 - 10;
+  const zone = ZONES_DATA.find(z => wx >= z.bounds.minX && wx <= z.bounds.maxX && wz >= z.bounds.minZ && wz <= z.bounds.maxZ);
+  if (zone) {
+    teleportToZone(zone.id);
+  } else if (!checkCollision(wx, wz, 0.45)) {
+    camera.position.set(wx, 1.68, wz);
+    closeAllModals();
+  }
+});
+
+// ============================================================================
+// 11. КНОПКИ ИНТЕРФЕЙСА И ГЛАВНЫЙ ЦИКЛ АНИМАЦИИ
+// ============================================================================
+document.getElementById('btn-start-lab').addEventListener('click', () => {
+  SoundFX.init();
+  SoundFX.robotGreet();
+  const welcome = document.getElementById('welcome-screen');
+  welcome.style.opacity = '0';
+  setTimeout(() => { welcome.style.display = 'none'; }, 500);
+  if (renderer.domElement.requestPointerLock) {
+    renderer.domElement.requestPointerLock();
+  }
+});
+
+document.getElementById('btn-inspect-now').addEventListener('click', triggerCurrentTarget);
+document.getElementById('mob-btn-inspect').addEventListener('click', triggerCurrentTarget);
+document.getElementById('btn-talk-instructor').addEventListener('click', openInstructorDialog);
+document.getElementById('mob-btn-instructor').addEventListener('click', openInstructorDialog);
+document.getElementById('btn-open-map').addEventListener('click', toggleMapModal);
+document.getElementById('minimap-trigger').addEventListener('click', toggleMapModal);
+document.getElementById('btn-close-eq-modal').addEventListener('click', closeAllModals);
+document.getElementById('btn-close-map-modal').addEventListener('click', closeAllModals);
+document.getElementById('btn-close-dialog').addEventListener('click', closeAllModals);
+
+document.getElementById('btn-toggle-sound').addEventListener('click', e => {
+  SoundFX.init();
+  SoundFX.enabled = !SoundFX.enabled;
+  e.target.textContent = SoundFX.enabled ? '🔊 Звук: ВКЛ' : '🔇 Звук: ВЫКЛ';
+  if (SoundFX.enabled) SoundFX.click();
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+const minimapCtx = document.getElementById('minimap-canvas').getContext('2d');
+const clock = new THREE.Clock();
+
+function updatePlayerMovement(dt) {
+  if (isModalOpen) return;
+
+  let forward = 0;
+  let right = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) forward += 1;
+  if (keys['KeyS'] || keys['ArrowDown']) forward -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) right += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) right -= 1;
+
+  if (Math.abs(joyInput.z) > 0.08) forward -= joyInput.z;
+  if (Math.abs(joyInput.x) > 0.08) right += joyInput.x;
+
+  if (forward !== 0 || right !== 0) {
+    const speed = (keys['ShiftLeft'] || keys['ShiftRight']) ? 5.6 : 3.6;
+    const sinY = Math.sin(camera.rotation.y);
+    const cosY = Math.cos(camera.rotation.y);
+
+    let dx = (-sinY * forward + cosY * right);
+    let dz = (-cosY * forward - sinY * right);
+    const len = Math.hypot(dx, dz);
+    if (len > 1) { dx /= len; dz /= len; }
+
+    const nextX = camera.position.x + dx * speed * dt;
+    const nextZ = camera.position.z + dz * speed * dt;
+
+    if (!checkCollision(nextX, camera.position.z)) camera.position.x = nextX;
+    if (!checkCollision(camera.position.x, nextZ)) camera.position.z = nextZ;
+
+    camera.position.y = 1.68 + Math.sin(clock.elapsedTime * 10) * 0.025;
+    SoundFX.step();
+  } else {
+    camera.position.y += (1.68 - camera.position.y) * 0.15;
+  }
+
+  const px = camera.position.x;
+  const pz = camera.position.z;
+  const currentZone = ZONES_DATA.find(z => px >= z.bounds.minX && px <= z.bounds.maxX && pz >= z.bounds.minZ && pz <= z.bounds.maxZ);
+  if (currentZone) {
+    document.getElementById('current-zone-title').textContent = currentZone.name;
+    document.getElementById('current-zone-desc').textContent = currentZone.desc;
+  } else {
+    document.getElementById('current-zone-title').textContent = 'Центральный проход лаборатории';
+    document.getElementById('current-zone-desc').textContent = 'Подойдите к любому столу или позовите инструктора';
+  }
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const elapsed = clock.elapsedTime;
+
+  updatePlayerMovement(dt);
+  RobotInstructor.update(dt, elapsed, camera.position);
+  updateTargetDetection();
+
+  EQUIPMENT_DATA.forEach((eq, idx) => {
+    const entry = equipmentMap[eq.id];
+    if (entry) {
+      entry.ring.scale.setScalar(1 + Math.sin(elapsed * 3 + idx) * 0.06);
+    }
+  });
+
+  drawLabBlueprint(minimapCtx, 220, 184, false);
+  renderer.render(scene, camera);
+  Preview3D.render();
+}
+
+animate();
+</script>
+</body>
+</html>
